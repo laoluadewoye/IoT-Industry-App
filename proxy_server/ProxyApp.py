@@ -1,9 +1,10 @@
 from pymongo import MongoClient
 from pymongo.database import Database, Collection
 from pymongo.errors import OperationFailure, CollectionInvalid, ConnectionFailure
+from pymongo.results import InsertOneResult
 from os import getenv
 from hashlib import sha256
-from flask import Flask, jsonify, Response, request
+from flask import Flask, jsonify, request
 from waitress import serve
 from time import time
 from datetime import datetime, UTC
@@ -30,6 +31,10 @@ with open('./hashed_passwords.txt', 'w') as hp_file:
 # Create flask app
 app = Flask(__name__)
 APP_START_TIME: float = time()
+
+# Dictionary to maintain sensors
+app_sensor_tracker: dict[int, list] = {}
+app_sensor_mod: int = 20  # Calculated by sqrt(n), where n is the number of entries expected in the equation x + n/x
 
 
 def create_database():
@@ -78,6 +83,9 @@ def create_database():
 
     print('Database created!')
 
+    # Close the connection
+    owner_client.close()
+
 
 def create_database_test():
     # Test
@@ -102,6 +110,28 @@ def create_database_test():
     )
 
     print('Database created!')
+
+    # Close the connection
+    owner_client.close()
+
+
+def insert_into_sensor_tracker(sensor_name: str) -> bool:
+    # Get the zipcode for sorting
+    sensor_info = sensor_name.split('_')
+    sensor_zipcode: int = int(sensor_info[0])
+
+    # Sort the zipcode into
+    sensor_already_existed = False
+    mod_location = sensor_zipcode % app_sensor_mod
+    if mod_location in app_sensor_tracker:
+        if sensor_name in app_sensor_tracker[mod_location]:
+            sensor_already_existed = True
+        else:
+            app_sensor_tracker[mod_location].append(sensor_name)
+    else:
+        app_sensor_tracker[mod_location] = [sensor_name]
+
+    return sensor_already_existed
 
 
 @app.route('/status', methods=['GET'])
@@ -157,15 +187,44 @@ def data_gen():
     # Insert the document into the connection
     try:
         cur_collection: Collection = data_gen_client['weather'][collection]
-        result = cur_collection.insert_one(document)
+        insert_result: InsertOneResult = cur_collection.insert_one(document)
     except OperationFailure:
         msg: str = f'Post request to do MongoDB insert operation with collection {collection} failed.'
         return jsonify({'status': 'Error', 'message': msg}), 400
 
+    # Add a new sensor to a collection of sensors if it does not exist
+    exist_status: bool = insert_into_sensor_tracker(document['sensor_name'])
+    if not exist_status:
+        try:
+            sensor_collection: Collection = data_gen_client['weather']['sensors']
+            sensor_result = sensor_collection.find_one({'sensor_name': document['sensor_name']})
+            if sensor_result is None:
+                sensor_collection.insert_one({
+                    'sensor_name': document['sensor_name'],
+                    'latitude': document['latitude'],
+                    'longitude': document['longitude']
+                })
+            attempted_sensor_insert = True
+        except OperationFailure:
+            msg: str = f'Post request to do MongoDB insert operation with collection sensors failed.'
+            return jsonify({'status': 'Error', 'message': msg}), 400
+    else:
+        sensor_result = None
+        attempted_sensor_insert = False
+
+    if not exist_status and sensor_result is None and attempted_sensor_insert:
+        sensor_msg = f'Sensor {document["sensor_name"]} has been added to local cache and database.'
+    elif not exist_status and sensor_result is not None and attempted_sensor_insert:
+        sensor_msg = f'Sensor {document["sensor_name"]} has been added to local cache but not database.'
+    else:
+        sensor_msg = f'Sensor {document["sensor_name"]} already exists in local cache.'
+
     # Return success
     msg: str = (
-        f'Post request to do MongoDB insert operation succeeded. '
-        f'Acknowledgement: {result.acknowledged}. Document ID: {result.inserted_id}'
+        f'Post request to do MongoDB insert operation succeeded.\n'
+        f'Acknowledgement: {insert_result.acknowledged}.\n'
+        f'Document ID: {insert_result.inserted_id}.\n'
+        f'Sensor Status: {sensor_msg}'
     )
     return jsonify({'status': 'success', 'message': msg}), 201
 

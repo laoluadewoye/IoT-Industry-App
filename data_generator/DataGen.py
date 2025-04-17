@@ -41,7 +41,7 @@ def row_to_dict(row: pd.Series) -> dict:
                 sub_dict[key] = sub_dict[key].item()
 
         # Add an updated datetime object
-        # sub_dict['time_recorded'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        sub_dict['time_recorded'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
         # Add to super-dictionary
         super_dict[metric] = sub_dict
