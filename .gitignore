@@ -1,0 +1,8 @@
+/zipcodes.csv
+/zipcode_data.csv
+/zipcode_data_sorted.csv
+/zipcode_data.zip
+/create_data_config.toml
+/CreateData.py
+secrets/
+.idea/

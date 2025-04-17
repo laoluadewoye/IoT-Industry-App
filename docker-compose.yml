@@ -1,0 +1,65 @@
+name: greenhouse-climate-app
+services:
+  mongo-db:
+    image: mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: db_owner
+      MONGO_INITDB_ROOT_PASSWORD_FILE: /run/secrets/db_owner_password
+    ports:
+      - 8000:27017
+    volumes:
+      - mongo-data:/data/db
+    secrets:
+      - db_owner_password
+    networks:
+      - proxy-back-network
+  db-proxy-server:
+    build: ./proxy_server
+    restart: unless-stopped
+    depends_on:
+      - mongo-db
+    environment:
+      DB_HOST: mongo-db
+      DB_PORT: 27017
+      DB_OWNER: db_owner
+      DB_OWNER_PASS_FILE: /run/secrets/db_owner_password
+      DATA_GEN: data_gen
+      DATA_GEN_PASSWORD_FILE: /run/secrets/data_gen_password
+      WEB_VIEW: web_view
+      WEB_VIEW_PASSWORD_FILE: /run/secrets/web_view_password
+    secrets:
+      - db_owner_password
+      - data_gen_password
+      - web_view_password
+    networks:
+      - proxy-back-network
+      - proxy-front-network
+  data-generator:
+    build: ./data_generator
+    restart: unless-stopped
+    depends_on:
+      - db-proxy-server
+    environment:
+      DB_HOST: mongo-db
+      DB_PORT: 27017
+      DB_USER: data_gen
+      DB_PASSWORD_FILE: /run/secrets/data_gen_password
+      PROXY_HOST: db-proxy-server
+      PROXY_PORT: 8079
+    secrets:
+      - data_gen_password
+    networks:
+      - proxy-front-network
+volumes:
+  mongo-data:
+networks:
+  proxy-front-network:
+  proxy-back-network:
+secrets:
+  db_owner_password:
+    file: secrets/db_owner_password.txt
+  data_gen_password:
+    file: secrets/data_gen_password.txt
+  web_view_password:
+    file: secrets/web_view_password.txt
