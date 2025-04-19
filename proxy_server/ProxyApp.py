@@ -229,6 +229,31 @@ def data_gen():
     return jsonify({'status': 'success', 'message': msg}), 201
 
 
+@app.route('/web_app/<purpose>', methods=['GET'])
+def web_app(purpose):
+    print(request.args)
+
+    # Access form fields from the POST request
+    try:
+        username: str = request.args.get('username')
+        password: str = request.args.get('password')
+        host: str = request.args.get('host')
+        port: str = request.args.get('port')
+    except KeyError:
+        return jsonify({'status': 'Error', 'message': 'Invalid request: Missing Form Field.'}), 400
+
+    # Verify username and password
+    if username != WEB_VIEW or password != HASHED_WEB_VIEW_PASSWORD:
+        msg: str = 'Invalid request: Invalid username or password for data generation API call.'
+        return jsonify({'status': 'Unauthorized', 'message': msg}), 401
+
+    # Verify host and port
+    if host != DB_HOST or port != DB_PORT:
+        return jsonify({'status': 'Unauthorized', 'message': 'Invalid request: Invalid host or port.'}), 401
+
+    return jsonify({'status': 'success', 'message': f'sample web view message for {purpose}'}), 201
+
+
 if __name__ == "__main__":
     # Create the database
     create_database()
