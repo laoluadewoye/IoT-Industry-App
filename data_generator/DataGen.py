@@ -6,6 +6,7 @@ from requests import post, Response
 from hashlib import sha256
 from typing import Union
 from datetime import datetime
+from json import dumps as json_dumps
 
 # Get core database environmental variables
 DB_HOST: str = getenv('DB_HOST')
@@ -60,7 +61,7 @@ def send_data(collection_name: str, document: dict):
         'host': DB_HOST,
         'port': DB_PORT,
         'collection': collection_name,
-        'document_str': str(document)
+        'document': json_dumps(document)
     }
 
     # Send a post request to the proxy server

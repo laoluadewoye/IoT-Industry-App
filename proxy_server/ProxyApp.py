@@ -2,15 +2,15 @@ from pymongo import MongoClient
 from pymongo.database import Database, Collection
 from pymongo.errors import OperationFailure, CollectionInvalid, ConnectionFailure
 from pymongo.results import InsertOneResult
-from pymongo.cursor import Cursor
 from os import getenv
+import sys
 from hashlib import sha256
 from flask import Flask, jsonify, request, Response
 from waitress import serve
 from time import time
 from datetime import datetime, UTC
-from ast import literal_eval
-import bson
+from json import loads as json_loads
+from typing import Union
 
 # Get core database environmental variables
 DB_HOST: str = getenv('DB_HOST')
@@ -37,6 +37,14 @@ APP_START_TIME: float = time()
 # Dictionary to maintain sensors
 app_sensor_tracker: dict[int, list] = {}
 app_sensor_mod: int = 20  # Calculated by sqrt(n), where n is the number of entries expected in the equation x + n/x
+
+# List of sensor measurements
+CUSTOMARY_MEASUREMENTS = [
+    'humidity_perc', 'precip_in', 'pressure_in', 'temp_f', 'uv_index_score', 'wind_degree', 'wind_dir', 'wind_mph'
+]
+METRIC_MEASUREMENTS = [
+    'humidity_perc', 'precip_mm', 'pressure_mb', 'temp_c', 'uv_index_score', 'wind_degree', 'wind_dir', 'wind_kph'
+]
 
 
 def create_database() -> None:
@@ -66,8 +74,8 @@ def create_database() -> None:
 
     # Create time-series collections
     measurements = [
-        'temp_c', 'temp_f', 'wind_mph', 'wind_kph', 'wind_degree', 'wind_dir', 'pressure_mb', 'pressure_in',
-        'precip_mm', 'precip_in', 'humidity_perc', 'uv_index_score'
+        'humidity_perc', 'precip_in', 'precip_mm', 'pressure_in', 'pressure_mb', 'temp_c',
+        'temp_f', 'uv_index_score', 'wind_degree', 'wind_dir', 'wind_kph', 'wind_mph'
     ]
     for measurement in measurements:
         try:
@@ -156,10 +164,9 @@ def data_gen() -> tuple[Response, int]:
         host: str = request.form.get('host')
         port: str = request.form.get('port')
         collection: str = request.form.get('collection')
-        document_str: str = request.form.get('document_str')
 
         # Decode the document
-        document: dict = literal_eval(document_str)
+        document: dict = json_loads(request.form.get('document'))
 
         # Convert the time field to utc datetime object
         document['time_recorded'] = datetime.strptime(document['time_recorded'], '%Y-%m-%d %H:%M:%S')
@@ -204,7 +211,11 @@ def data_gen() -> tuple[Response, int]:
                 sensor_collection.insert_one({
                     'sensor_name': document['sensor_name'],
                     'latitude': document['latitude'],
-                    'longitude': document['longitude']
+                    'longitude': document['longitude'],
+                    'city': document['city'],
+                    'county': document['county'],
+                    'state': document['state'],
+                    'zip_code': document['zip_code']
                 })
             attempted_sensor_insert: bool = True
         except OperationFailure:
@@ -231,16 +242,55 @@ def data_gen() -> tuple[Response, int]:
     return jsonify({'status': 'Success', 'message': msg}), 201
 
 
-@app.route('/web_app/<purpose>', methods=['GET'])
-def web_app(purpose: str) -> tuple[Response, int]:
+def get_latest_measurements(client: MongoClient, measurements: list[str], all_or_selected: str,
+                            selected_sensors: list[str]) -> dict[str, list]:
+    # Start measurement super dictionary
+    latest_measurements: dict[str, list] = {}
+
+    # Get a list of the latest measurement for each sensor for each measurement
+    for measurement in measurements:
+        # Create the measurement pipeline based on filter settings
+        if all_or_selected in ['All', 'Empty'] or 'Empty' in selected_sensors:
+            measurement_pipeline = [
+                {'$sort': {'time_recorded': -1}},
+                {'$group': {'_id': '$sensor_name', 'latest_value': {'$first': '$metric'}}}
+            ]
+        else:
+            measurement_pipeline = [
+                {'$match': {'sensor_name': {'$in': selected_sensors}}},
+                {'$sort': {'time_recorded': -1}},
+                {'$group': {'_id': '$sensor_name', 'latest_value': {'$first': '$metric'}}}
+            ]
+
+        # Use aggregate pipeline to get the latest recorded value for each sensor
+        cur_collection: Collection = client['weather'][measurement]
+        latest_record = cur_collection.aggregate(measurement_pipeline, allowDiskUse=True).to_list()
+
+        # Save the list of results to super dictionary
+        latest_measurements[measurement] = latest_record
+
+    return latest_measurements
+
+
+@app.route('/web_app', methods=['GET'])
+def web_app() -> tuple[Response, int]:
     # Access arg fields from the Get request
     try:
-        username: str = request.args.get('username')
-        password: str = request.args.get('password')
-        host: str = request.args.get('host')
-        port: str = request.args.get('port')
+        json_content = request.get_json(force=True)
+        purpose = int(json_content['purpose'])  # 0 for sensors, 1 for real time, 2 for historical
+        username = json_content['username']
+        password = json_content['password']
+        host = json_content['host']
+        port = json_content['port']
+
+        if purpose != 0:
+            filters: Union[dict, None] = json_content['filters']
+        else:
+            filters: Union[dict, None] = None
     except KeyError:
         return jsonify({'status': 'Error', 'message': 'Invalid request: Missing Form Field.'}), 400
+    except (ValueError, SyntaxError):
+        return jsonify({'status': 'Error', 'message': 'Invalid request: Invalid JSON Format.'}), 400
 
     # Verify username and password
     if username != WEB_VIEW or password != HASHED_WEB_VIEW_PASSWORD:
@@ -261,12 +311,41 @@ def web_app(purpose: str) -> tuple[Response, int]:
 
     # Complete the desired operation
     try:
-        if purpose == 'sensors':
+        with open('./request_log.txt', 'a') as log_file:
+            log_file.write(f'Args: {request.args}\n')
+            log_file.write(f'Headers: {request.headers}\n')
+            log_file.write(f'URL: {request.url}\n')
+            log_file.write(f'Client IP: {request.remote_addr}\n\n')
+            log_file.write(f'JSON: {json_content}\n\n')
+            log_file.write('----------------------------------------------------\n\n\n')
+
+        # Only do if the purpose is for sensor information retrieval
+        if purpose == 0:
             cur_collection: Collection = web_view_client['weather']['sensors']
-            operation_result: list = cur_collection.find().to_list()
+            operation_result: Union[dict, list] = cur_collection.find().to_list()
             for document in operation_result:
                 document['_id'] = str(document['_id'])
-        else:
+
+        # Only do if the purpose is for real-time information retrieval
+        if purpose == 1:
+            # Select the measurement system to use
+            if filters['metric_or_customary'] in ['Metric', 'Empty']:
+                cur_measurements = METRIC_MEASUREMENTS
+            else:
+                cur_measurements = CUSTOMARY_MEASUREMENTS
+
+            # Cycle through all sensors
+            operation_result: Union[dict, list] = get_latest_measurements(
+                web_view_client, cur_measurements, filters['all_or_selected'], filters['selected_sensors']
+            )
+
+        # TODO: Add historical retrieval
+        # Only do if the purpose is for historical information retrieval
+        if purpose == 2:
+            operation_result: Union[dict, list] = {'I am': 'a teapot'}
+
+        # Make sure the purpose is valid
+        if purpose not in [0, 1, 2]:
             raise KeyError
     except (TypeError, OperationFailure) as e:
         msg: str = f'Get request to do MongoDB select operation of category {purpose} failed. Reason: {e}'
@@ -274,7 +353,7 @@ def web_app(purpose: str) -> tuple[Response, int]:
     except KeyError:
         msg: str = (
             f'Get request to do MongoDB select operation of category {purpose} failed. '
-            f'Invalid purpose for data generation API call.'
+            f'Invalid purpose for web viewer API call.'
         )
         return jsonify({'status': 'Error', 'message': msg}), 400
 
@@ -283,6 +362,9 @@ def web_app(purpose: str) -> tuple[Response, int]:
 
 
 if __name__ == "__main__":
+    # Force the output to appear
+    sys.stdout.flush()
+
     # Create the database
     create_database()
 
