@@ -9,7 +9,7 @@ from typing import Union
 from collections import Counter
 
 # Get core database environmental variables
-defaults = {
+defaults: dict[str, str] = {
     'DB_HOST': 'mongo-db', 'DB_PORT': '27017', 'DB_USER': 'web_view',
     'DB_PASSWORD_FILE': '../secrets/web_view_password.txt', 'PROXY_HOST': 'localhost', 'PROXY_PORT': '8079'
 }
@@ -22,7 +22,7 @@ PROXY_HOST: str = getenv('PROXY_HOST', defaults['PROXY_HOST'])
 PROXY_PORT: str = getenv('PROXY_PORT', defaults['PROXY_PORT'])
 
 
-def load_data(content: dict[str, str]) -> Union[dict[str, list], list[dict]]:
+def load_data(content: dict[str, str]) -> Union[dict[str, list], list[dict], None]:
     # Send a get request to the proxy server
     response: Response = get(f'http://{PROXY_HOST}:{PROXY_PORT}/web_app', json=content, timeout=10)
 
@@ -30,12 +30,13 @@ def load_data(content: dict[str, str]) -> Union[dict[str, list], list[dict]]:
     response_json = response.json()
     if response_json['status'] != 'Success':
         st.error(response_json['message'])
+        return None
 
     return response.json()['result']
 
 
 @st.cache_data(max_entries=3, ttl=10)
-def load_sensor_data() -> list[dict]:
+def load_sensor_data() -> Union[list[dict], None]:
     # Create password hash
     hashed_data_gen_password: str = sha256(open(DB_PASSWORD_FILE).read().encode()).hexdigest()
 
@@ -51,14 +52,14 @@ def load_sensor_data() -> list[dict]:
     return load_data(content)
 
 
-def load_real_time_data() -> dict[str, list]:
+def load_real_time_data() -> Union[dict[str, list], None]:
     # Create password hash
     hashed_data_gen_password: str = sha256(open(DB_PASSWORD_FILE).read().encode()).hexdigest()
 
     # Obtain filters with default handling
-    all_or_selected_filter = st.session_state.get('all_or_selected', 'Empty')
-    selected_sensors_filter = st.session_state.get('selected_sensors', ['Empty'])
-    metric_or_customary_filter = st.session_state.get('metric_or_customary', 'Empty')
+    all_or_selected_filter: str = st.session_state.get('all_or_selected', 'Empty')
+    selected_sensors_filter: str = st.session_state.get('selected_sensors', ['Empty'])
+    metric_or_customary_filter: str = st.session_state.get('metric_or_customary', 'Empty')
 
     # Create message content
     content: dict = {
@@ -111,7 +112,10 @@ def create_filter_settings() -> None:
         st.text('To use this feature, select "Selected Options" above.')
 
     # Get data and save information to session state and sensor list
-    sensor_data: list[dict] = load_sensor_data()
+    sensor_data: Union[list[dict], None] = load_sensor_data()
+    if sensor_data is None:
+        sensor_data = []
+
     sensor_list: list[str] = [document['sensor_name'] for document in sensor_data]
 
     # Create dropdown
@@ -125,7 +129,7 @@ def create_filter_settings() -> None:
 @st.fragment(run_every=3)
 def create_sensor_map() -> st.map:
     # Create the map around the DMV
-    vienna_coordinates = [38.900692, -77.270946]
+    vienna_coordinates: list[float] = [38.900692, -77.270946]
     sensor_map_folium: FoliumMap = FoliumMap(vienna_coordinates, zoom_start=8)
 
     # Add markers for each sensor
@@ -141,13 +145,13 @@ def create_sensor_map() -> st.map:
 
         # Add new marker to the map
         if selected:
-            new_marker = FoliumMarker(
+            new_marker: Union[FoliumMarker, FoliumCircleMarker] = FoliumMarker(
                 [row['Latitude'], row['Longitude']],
                 popup=popup_text,
                 icon=FoliumIcon(color='red'),
             )
         else:
-            new_marker = FoliumCircleMarker(
+            new_marker: Union[FoliumMarker, FoliumCircleMarker] = FoliumCircleMarker(
                 [row['Latitude'], row['Longitude']],
                 popup=popup_text,
                 color='blue',
@@ -168,8 +172,11 @@ def create_sensor_tab() -> None:
     st.text('This tab provides a summary of the sensors in the database, along with their locations in Maryland.')
 
     # Get data for the table
-    sensor_data = load_sensor_data()
-    sensor_list = [
+    sensor_data: Union[list[dict], None] = load_sensor_data()
+    if sensor_data is None:
+        sensor_data = []
+
+    sensor_list: list[list] = [
         [
             document['_id'], document['sensor_name'], document['city'], document['county'], document['state'],
             document['latitude'], document['longitude']
@@ -201,29 +208,29 @@ def create_real_time_data_container(real_time_data: dict[str, list], metric_pack
         _, col7, _ = st.columns(3, gap='medium')
 
         # Loop through all the metrics
-        columns = [col1, col2, col3, col4, col5, col6, col7]
-        column_index = 0
+        columns: list = [col1, col2, col3, col4, col5, col6, col7]
+        column_index: int = 0
         for metric_key, metric_name, metric_modifier in metric_package:
             if metric_name == 'Wind Direction':
                 continue
             elif metric_name == 'Wind Degrees':
                 # Summarize the data
-                metric_data = real_time_data[metric_key]
-                metric_total = sum(document['latest_value'] for document in metric_data)
-                metric_avg = round(metric_total / len(metric_data), 2)
+                metric_data: list[dict] = real_time_data[metric_key]
+                metric_total: float = sum(document['latest_value'] for document in metric_data)
+                metric_avg: float = round(metric_total / len(metric_data), 2)
 
                 # Create delta
-                delta_data = real_time_data['wind_dir']
-                delta_total = [document['latest_value'] for document in delta_data]
-                delta_mode = Counter(delta_total).most_common(1)[0][0]
+                delta_data: list[dict] = real_time_data['wind_dir']
+                delta_total: list[str] = [document['latest_value'] for document in delta_data]
+                delta_mode: str = Counter(delta_total).most_common(1)[0][0]
 
                 # Create metric
                 columns[column_index].metric(metric_name, f'{metric_avg}{metric_modifier}', delta_mode)
             else:
                 # Summarize the data
-                metric_data = real_time_data[metric_key]
-                metric_total = sum(document['latest_value'] for document in metric_data)
-                metric_avg = round(metric_total / len(metric_data), 2)
+                metric_data: list[dict] = real_time_data[metric_key]
+                metric_total: float = sum(document['latest_value'] for document in metric_data)
+                metric_avg: float = round(metric_total / len(metric_data), 2)
 
                 # Create metric
                 columns[column_index].metric(metric_name, f'{metric_avg}{metric_modifier}')
@@ -244,32 +251,36 @@ def create_real_time_tab() -> None:
         st.header('The Latest Real-Time Data for Selected Sensors')
 
         # Create additional text
-        selected_sensor_cities = st.session_state['sensor_df'][
+        selected_sensor_cities: list[str] = st.session_state['sensor_df'][
             st.session_state['sensor_df']['Sensor Name'].isin(st.session_state['selected_sensors'])
         ]['City'].to_list()
         if len(selected_sensor_cities) > 3:
-            cities_str = ', '.join(selected_sensor_cities[:3])
+            cities_str: str = ', '.join(selected_sensor_cities[:3])
             st.text(f'The averages are calculated from {cities_str}, '
                     f'and {len(selected_sensor_cities) - 3} other locations.')
         else:
-            cities_str = ', '.join(selected_sensor_cities)
+            cities_str: str = ', '.join(selected_sensor_cities)
             st.text(f'The averages are calculated from {cities_str[:-2]}.')
 
     # Get data for boxes
-    real_time_data: dict[str, list] = load_real_time_data()
-
-    # Create metrics
-    metric_keys = list(real_time_data.keys())
-    generic_metric_names = [
-        'Humidity', 'Precipitation', 'Pressure', 'Temperature', 'UV Index', 'Wind Degrees', 'Wind Direction',
-        'Wind Speed'
-    ]
-    metric_modifiers = list(st.session_state['unit_modifiers'])
-    create_real_time_data_container(real_time_data, zip(metric_keys, generic_metric_names, metric_modifiers))
+    real_time_data: Union[dict[str, list], None] = load_real_time_data()
+    if real_time_data is not None:
+        # Create metrics
+        metric_keys: list[str] = list(real_time_data.keys())
+        generic_metric_names: list[str] = [
+            'Humidity', 'Precipitation', 'Pressure', 'Temperature', 'UV Index', 'Wind Degrees', 'Wind Direction',
+            'Wind Speed'
+        ]
+        metric_modifiers: list[str] = list(st.session_state['unit_modifiers'])
+        create_real_time_data_container(real_time_data, zip(metric_keys, generic_metric_names, metric_modifiers))
 
 
 def create_historical_tab() -> None:
     st.write('Historical Data')
+
+
+def create_anomaly_tab() -> None:
+    st.write('Anomaly Data')
 
 
 # Create initial settings and title
@@ -281,8 +292,8 @@ with st.sidebar:
     create_filter_settings()
 
 # Create tabs
-sensor_tab, real_time_tab, historical_tab = st.tabs(
-    ['Sensor Information', 'Real Time Information', 'Historical Information']
+sensor_tab, real_time_tab, historical_tab, anomaly_tab = st.tabs(
+    ['Sensor Information', 'Real Time Information', 'Historical Information', 'Anomaly Information']
 )
 
 with sensor_tab:
@@ -293,3 +304,6 @@ with real_time_tab:
 
 with historical_tab:
     create_historical_tab()
+
+with anomaly_tab:
+    create_anomaly_tab()

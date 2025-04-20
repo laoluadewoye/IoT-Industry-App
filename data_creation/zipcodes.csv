@@ -1,0 +1,469 @@
+state,city,county,zip_code
+Maryland,Waldorf,Charles,20601
+Maryland,Waldorf,Charles,20602
+Maryland,Waldorf,Charles,20603
+Maryland,Abell,St. Mary's,20606
+Maryland,Accokeek,Prince George's,20607
+Maryland,Aquasco,Prince George's,20608
+Maryland,Avenue,St. Mary's,20609
+Maryland,Bel Alton,Charles,20611
+Maryland,Benedict,Charles,20612
+Maryland,Brandywine,Prince George's,20613
+Maryland,Broomes Island,Calvert,20615
+Maryland,Bryans Road,Charles,20616
+Maryland,Bryantown,Charles,20617
+Maryland,Bushwood,St. Mary's,20618
+Maryland,California,St. Mary's,20619
+Maryland,Callaway,St. Mary's,20620
+Maryland,Chaptico,St. Mary's,20621
+Maryland,Charlotte Hall,Charles,20622
+Maryland,Cheltenham,Prince George's,20623
+Maryland,Clements,St. Mary's,20624
+Maryland,Cobb Island,Charles,20625
+Maryland,Coltons Point,St. Mary's,20626
+Maryland,Dameron,St. Mary's,20628
+Maryland,Dowell,Calvert,20629
+Maryland,Drayden,St. Mary's,20630
+Maryland,Faulkner,Charles,20632
+Maryland,Great Mills,St. Mary's,20634
+Maryland,Hollywood,St. Mary's,20636
+Maryland,Hughesville,Charles,20637
+Maryland,Huntingtown,Calvert,20639
+Maryland,Indian Head,Charles,20640
+Maryland,Issue,Charles,20645
+Maryland,La Plata,Charles,20646
+Maryland,Leonardtown,St. Mary's,20650
+Maryland,Lexington Park,St. Mary's,20653
+Maryland,Lusby,Calvert,20657
+Maryland,Marbury,Charles,20658
+Maryland,Mechanicsville,St. Mary's,20659
+Maryland,Morganza,St. Mary's,20660
+Maryland,Nanjemoy,Charles,20662
+Maryland,Newburg,Charles,20664
+Maryland,Park Hall,St. Mary's,20667
+Maryland,Patuxent River,St. Mary's,20670
+Maryland,Piney Point,St. Mary's,20674
+Maryland,Pomfret,Charles,20675
+Maryland,Port Republic,Calvert,20676
+Maryland,Port Tobacco,Charles,20677
+Maryland,Prince Frederick,Calvert,20678
+Maryland,Ridge,St. Mary's,20680
+Maryland,Saint Inigoes,St. Mary's,20684
+Maryland,Saint Leonard,Calvert,20685
+Maryland,Saint Marys City,St. Mary's,20686
+Maryland,Scotland,St. Mary's,20687
+Maryland,Solomons,Calvert,20688
+Maryland,Sunderland,Calvert,20689
+Maryland,Tall Timbers,St. Mary's,20690
+Maryland,Valley Lee,St. Mary's,20692
+Maryland,Welcome,Charles,20693
+Maryland,White Plains,Charles,20695
+Maryland,Annapolis Junction,Howard,20701
+Maryland,Beltsville,Prince George's,20705
+Maryland,Lanham,Prince George's,20706
+Maryland,Laurel,Prince George's,20707
+Maryland,Laurel,Prince George's,20708
+Maryland,Bladensburg,Prince George's,20710
+Maryland,Lothian Anne,Arundel,20711
+Maryland,Mount Rainier,Prince George's,20712
+Maryland,North Beach,Calvert,20714
+Maryland,Bowie,Prince George's,20715
+Maryland,Bowie,Prince George's,20716
+Maryland,Bowie,Prince George's,20720
+Maryland,Bowie,Prince George's,20721
+Maryland,Brentwood,Prince George's,20722
+Maryland,Laurel,Howard,20723
+Maryland,Laurel Anne,Arundel,20724
+Maryland,Chesapeake Beach,Calvert,20732
+Maryland,Churchton Anne,Arundel,20733
+Maryland,Clinton,Prince George's,20735
+Maryland,Owings,Calvert,20736
+Maryland,Riverdale,Prince George's,20737
+Maryland,College Park,Prince George's,20740
+Maryland,College Park,Prince George's,20742
+Maryland,Capitol Heights,Prince George's,20743
+Maryland,Fort Washington,Prince George's,20744
+Maryland,Oxon Hill,Prince George's,20745
+Maryland,Suitland,Prince George's,20746
+Maryland,District Heights,Prince George's,20747
+Maryland,Temple Hills,Prince George's,20748
+Maryland,Deale Anne,Arundel,20751
+Maryland,Dunkirk,Calvert,20754
+Maryland,Fort George G Meade Anne,Arundel,20755
+Maryland,Friendship Anne,Arundel,20758
+Maryland,Fulton,Howard,20759
+Maryland,Andrews Air Force Base,Prince George's,20762
+Maryland,Savage,Howard,20763
+Maryland,Shady Side Anne,Arundel,20764
+Maryland,Galesville Anne,Arundel,20765
+Maryland,Glenn Dale,Prince George's,20769
+Maryland,Greenbelt,Prince George's,20770
+Maryland,Upper Marlboro,Prince George's,20772
+Maryland,Upper Marlboro,Prince George's,20774
+Maryland,Harwood Anne,Arundel,20776
+Maryland,Highland,Howard,20777
+Maryland,West River Anne,Arundel,20778
+Maryland,Tracys Landing Anne,Arundel,20779
+Maryland,Hyattsville,Prince George's,20781
+Maryland,Hyattsville,Prince George's,20782
+Maryland,Hyattsville,Prince George's,20783
+Maryland,Hyattsville,Prince George's,20784
+Maryland,Hyattsville,Prince George's,20785
+Maryland,Jessup,Howard,20794
+Maryland,Glen Echo,Montgomery,20812
+Maryland,Bethesda,Montgomery,20814
+Maryland,Chevy Chase,Montgomery,20815
+Maryland,Bethesda,Montgomery,20816
+Maryland,Bethesda,Montgomery,20817
+Maryland,Cabin John,Montgomery,20818
+Maryland,Olney,Montgomery,20832
+Maryland,Brookeville,Montgomery,20833
+Maryland,Poolesville,Montgomery,20837
+Maryland,Barnesville,Montgomery,20838
+Maryland,Beallsville,Montgomery,20839
+Maryland,Boyds,Montgomery,20841
+Maryland,Dickerson,Montgomery,20842
+Maryland,Rockville,Montgomery,20850
+Maryland,Rockville,Montgomery,20851
+Maryland,Rockville,Montgomery,20852
+Maryland,Rockville,Montgomery,20853
+Maryland,Potomac,Montgomery,20854
+Maryland,Derwood,Montgomery,20855
+Maryland,Sandy Spring,Montgomery,20860
+Maryland,Ashton,Montgomery,20861
+Maryland,Brinklow,Montgomery,20862
+Maryland,Burtonsville,Montgomery,20866
+Maryland,Spencerville,Montgomery,20868
+Maryland,Clarksburg,Montgomery,20871
+Maryland,Damascus,Montgomery,20872
+Maryland,Germantown,Montgomery,20874
+Maryland,Germantown,Montgomery,20876
+Maryland,Gaithersburg,Montgomery,20877
+Maryland,Gaithersburg,Montgomery,20878
+Maryland,Gaithersburg,Montgomery,20879
+Maryland,Washington Grove,Montgomery,20880
+Maryland,Gaithersburg,Montgomery,20882
+Maryland,Montgomery Village,Montgomery,20886
+Maryland,Kensington,Montgomery,20895
+Maryland,Garrett Park,Montgomery,20896
+Maryland,Gaithersburg,Montgomery,20899
+Maryland,Silver Spring,Montgomery,20901
+Maryland,Silver Spring,Montgomery,20902
+Maryland,Silver Spring,Montgomery,20903
+Maryland,Silver Spring,Montgomery,20904
+Maryland,Silver Spring,Montgomery,20905
+Maryland,Silver Spring,Montgomery,20906
+Maryland,Silver Spring,Montgomery,20910
+Maryland,Takoma Park,Montgomery,20912
+Maryland,Aberdeen,Harford,21001
+Maryland,Aberdeen Proving Ground,Harford,21005
+Maryland,Abingdon,Harford,21009
+Maryland,Gunpowder,Harford,21010
+Maryland,Arnold Anne,Arundel,21012
+Maryland,Baldwin,Baltimore,21013
+Maryland,Bel Air,Harford,21014
+Maryland,Bel Air,Harford,21015
+Maryland,Belcamp,Harford,21017
+Maryland,Churchville,Harford,21028
+Maryland,Clarksville,Howard,21029
+Maryland,Cockeysville,Baltimore,21030
+Maryland,Hunt Valley,Baltimore,21031
+Maryland,Crownsville Anne,Arundel,21032
+Maryland,Darlington,Harford,21034
+Maryland,Davidsonville Anne,Arundel,21035
+Maryland,Dayton,Howard,21036
+Maryland,Edgewater Anne,Arundel,21037
+Maryland,Edgewood,Harford,21040
+Maryland,Ellicott City,Howard,21042
+Maryland,Ellicott City,Howard,21043
+Maryland,Columbia,Howard,21044
+Maryland,Columbia,Howard,21045
+Maryland,Columbia,Howard,21046
+Maryland,Fallston,Harford,21047
+Maryland,Finksburg,Carroll,21048
+Maryland,Forest Hill,Harford,21050
+Maryland,Fork,Baltimore,21051
+Maryland,Fort Howard,Baltimore,21052
+Maryland,Freeland,Baltimore,21053
+Maryland,Gambrills Anne,Arundel,21054
+Maryland,Gibson Island Anne,Arundel,21056
+Maryland,Glen Arm,Baltimore,21057
+Maryland,Glen Burnie Anne,Arundel,21060
+Maryland,Glen Burnie Anne,Arundel,21061
+Maryland,Glyndon,Baltimore,21071
+Maryland,Hampstead,Carroll,21074
+Maryland,Elkridge,Howard,21075
+Maryland,Hanover Anne,Arundel,21076
+Maryland,Harmans Anne,Arundel,21077
+Maryland,Havre De Grace,Harford,21078
+Maryland,Hydes,Baltimore,21082
+Maryland,Jarrettsville,Harford,21084
+Maryland,Joppa,Harford,21085
+Maryland,Kingsville,Baltimore,21087
+Maryland,Linthicum Heights Anne,Arundel,21090
+Maryland,Lutherville Timonium,Baltimore,21093
+Maryland,Manchester,Carroll,21102
+Maryland,Marriottsville,Carroll,21104
+Maryland,Maryland Line,Baltimore,21105
+Maryland,Millersville Anne,Arundel,21108
+Maryland,Monkton,Baltimore,21111
+Maryland,Odenton Anne,Arundel,21113
+Maryland,Crofton Anne,Arundel,21114
+Maryland,Owings Mills,Baltimore,21117
+Maryland,Parkton,Baltimore,21120
+Maryland,Pasadena Anne,Arundel,21122
+Maryland,Perry Hall,Baltimore,21128
+Maryland,Perryman,Harford,21130
+Maryland,Phoenix,Baltimore,21131
+Maryland,Pylesville,Harford,21132
+Maryland,Randallstown,Baltimore,21133
+Maryland,Reisterstown,Baltimore,21136
+Maryland,Riva Anne,Arundel,21140
+Maryland,Severn Anne,Arundel,21144
+Maryland,Severna Park Anne,Arundel,21146
+Maryland,Sparks Glencoe,Baltimore,21152
+Maryland,Stevenson,Baltimore,21153
+Maryland,Street,Harford,21154
+Maryland,Upperco,Baltimore,21155
+Maryland,Upper Falls,Baltimore,21156
+Maryland,Westminster,Carroll,21157
+Maryland,Westminster,Carroll,21158
+Maryland,Whiteford,Harford,21160
+Maryland,White Hall,Harford,21161
+Maryland,White Marsh,Baltimore,21162
+Maryland,Woodstock,Howard,21163
+Maryland,Baltimore,Baltimore,21201
+Maryland,Baltimore,Baltimore,21202
+Maryland,Towson,Baltimore,21204
+Maryland,Baltimore,Baltimore,21205
+Maryland,Baltimore,Baltimore,21206
+Maryland,Gwynn Oak,Baltimore,21207
+Maryland,Pikesville,Baltimore,21208
+Maryland,Baltimore,Baltimore,21209
+Maryland,Baltimore,Baltimore,21210
+Maryland,Baltimore,Baltimore,21211
+Maryland,Baltimore,Baltimore,21212
+Maryland,Baltimore,Baltimore,21213
+Maryland,Baltimore,Baltimore,21214
+Maryland,Baltimore,Baltimore,21215
+Maryland,Baltimore,Baltimore,21216
+Maryland,Baltimore,Baltimore,21217
+Maryland,Baltimore,Baltimore,21218
+Maryland,Sparrows Point,Baltimore,21219
+Maryland,Middle River,Baltimore,21220
+Maryland,Essex,Baltimore,21221
+Maryland,Dundalk,Baltimore,21222
+Maryland,Baltimore,Baltimore,21223
+Maryland,Baltimore,Baltimore,21224
+Maryland,Brooklyn,Baltimore,21225
+Maryland,Curtis Bay Anne,Arundel,21226
+Maryland,Halethorpe,Baltimore,21227
+Maryland,Catonsville,Baltimore,21228
+Maryland,Baltimore,Baltimore,21229
+Maryland,Baltimore,Baltimore,21230
+Maryland,Baltimore,Baltimore,21231
+Maryland,Parkville,Baltimore,21234
+Maryland,Nottingham,Baltimore,21236
+Maryland,Rosedale,Baltimore,21237
+Maryland,Baltimore,Baltimore,21239
+Maryland,Baltimore Anne,Arundel,21240
+Maryland,Windsor Mill,Baltimore,21244
+Maryland,Baltimore,Baltimore,21250
+Maryland,Baltimore,Baltimore,21251
+Maryland,Towson,Baltimore,21252
+Maryland,Towson,Baltimore,21286
+Maryland,Annapolis Anne,Arundel,21401
+Maryland,Annapolis Anne,Arundel,21402
+Maryland,Annapolis Anne,Arundel,21403
+Maryland,Annapolis Anne,Arundel,21405
+Maryland,Annapolis Anne,Arundel,21409
+Maryland,Cumberland,Allegany,21502
+Maryland,Accident,Garrett,21520
+Maryland,Barton,Allegany,21521
+Maryland,Bittinger,Garrett,21522
+Maryland,Bloomington,Garrett,21523
+Maryland,Corriganville,Allegany,21524
+Maryland,Ellerslie,Allegany,21529
+Maryland,Flintstone,Allegany,21530
+Maryland,Friendsville,Garrett,21531
+Maryland,Frostburg,Allegany,21532
+Maryland,Grantsville,Garrett,21536
+Maryland,Kitzmiller,Garrett,21538
+Maryland,Lonaconing,Allegany,21539
+Maryland,Luke,Allegany,21540
+Maryland,McHenry,Garrett,21541
+Maryland,Midland,Allegany,21542
+Maryland,Midlothian,Allegany,21543
+Maryland,Mount Savage,Allegany,21545
+Maryland,Oakland,Garrett,21550
+Maryland,Oldtown,Allegany,21555
+Maryland,Rawlings,Allegany,21557
+Maryland,Swanton,Garrett,21561
+Maryland,Westernport,Allegany,21562
+Maryland,Easton,Talbot,21601
+Maryland,Barclay,Queen Anne's,21607
+Maryland,Betterton,Kent,21610
+Maryland,Bozman,Talbot,21612
+Maryland,Cambridge,Dorchester,21613
+Maryland,Centreville,Queen Anne's,21617
+Maryland,Chester,Queen Anne's,21619
+Maryland,Chestertown,Kent,21620
+Maryland,Church Creek,Dorchester,21622
+Maryland,Church Hill,Queen Anne's,21623
+Maryland,Claiborne,Talbot,21624
+Maryland,Cordova,Talbot,21625
+Maryland,Crapo,Dorchester,21626
+Maryland,Crocheron,Dorchester,21627
+Maryland,Crumpton,Queen Anne's,21628
+Maryland,Denton,Caroline,21629
+Maryland,East New Market,Dorchester,21631
+Maryland,Federalsburg,Caroline,21632
+Maryland,Fishing Creek,Dorchester,21634
+Maryland,Galena,Kent,21635
+Maryland,Goldsboro,Caroline,21636
+Maryland,Grasonville,Queen Anne's,21638
+Maryland,Greensboro,Caroline,21639
+Maryland,Henderson,Caroline,21640
+Maryland,Hillsboro,Caroline,21641
+Maryland,Hurlock,Dorchester,21643
+Maryland,Ingleside,Queen Anne's,21644
+Maryland,Kennedyville,Kent,21645
+Maryland,Mcdaniel,Talbot,21647
+Maryland,Madison,Dorchester,21648
+Maryland,Marydel,Caroline,21649
+Maryland,Massey,Kent,21650
+Maryland,Millington,Kent,21651
+Maryland,Neavitt,Talbot,21652
+Maryland,Newcomb,Talbot,21653
+Maryland,Oxford,Talbot,21654
+Maryland,Preston,Caroline,21655
+Maryland,Queen Anne,Queen Anne's,21657
+Maryland,Queenstown,Queen Anne's,21658
+Maryland,Rhodesdale,Dorchester,21659
+Maryland,Ridgely,Caroline,21660
+Maryland,Rock Hall,Kent,21661
+Maryland,Royal Oak,Talbot,21662
+Maryland,Saint Michaels,Talbot,21663
+Maryland,Secretary,Dorchester,21664
+Maryland,Sherwood,Talbot,21665
+Maryland,Stevensville,Queen Anne's,21666
+Maryland,Still Pond,Kent,21667
+Maryland,Sudlersville,Queen Anne's,21668
+Maryland,Taylors Island,Dorchester,21669
+Maryland,Tilghman,Talbot,21671
+Maryland,Toddville,Dorchester,21672
+Maryland,Trappe,Talbot,21673
+Maryland,Wingate,Dorchester,21675
+Maryland,Wittman,Talbot,21676
+Maryland,Woolford,Dorchester,21677
+Maryland,Worton,Kent,21678
+Maryland,Wye Mills,Talbot,21679
+Maryland,Frederick,Frederick,21701
+Maryland,Frederick,Frederick,21702
+Maryland,Frederick,Frederick,21703
+Maryland,Frederick,Frederick,21704
+Maryland,Frederick,Frederick,21705
+Maryland,Adamstown,Frederick,21710
+Maryland,Big Pool,Washington,21711
+Maryland,Boonsboro,Washington,21713
+Maryland,Braddock Heights,Frederick,21714
+Maryland,Brunswick,Frederick,21716
+Maryland,Buckeystown,Frederick,21717
+Maryland,Burkittsville,Frederick,21718
+Maryland,Cascade,Washington,21719
+Maryland,Clear Spring,Washington,21722
+Maryland,Cooksville,Howard,21723
+Maryland,Emmitsburg,Frederick,21727
+Maryland,Fairplay,Washington,21733
+Maryland,Funkstown,Washington,21734
+Maryland,Glenelg,Howard,21737
+Maryland,Glenwood,Howard,21738
+Maryland,Hagerstown,Washington,21740
+Maryland,Hagerstown,Washington,21742
+Maryland,Hagerstown,Washington,21746
+Maryland,Hancock,Washington,21750
+Maryland,Ijamsville,Frederick,21754
+Maryland,Jefferson,Frederick,21755
+Maryland,Keedysville,Washington,21756
+Maryland,Keymar,Frederick,21757
+Maryland,Knoxville,Frederick,21758
+Maryland,Libertytown,Frederick,21762
+Maryland,Little Orleans,Allegany,21766
+Maryland,Maugansville,Washington,21767
+Maryland,Middletown,Frederick,21769
+Maryland,Monrovia,Frederick,21770
+Maryland,Mount Airy,Frederick,21771
+Maryland,Myersville,Frederick,21773
+Maryland,New Market,Frederick,21774
+Maryland,New Windsor,Carroll,21776
+Maryland,Point Of Rocks,Frederick,21777
+Maryland,Rocky Ridge,Frederick,21778
+Maryland,Rohrersville,Washington,21779
+Maryland,Sabillasville,Frederick,21780
+Maryland,Saint James,Washington,21781
+Maryland,Sharpsburg,Washington,21782
+Maryland,Smithsburg,Washington,21783
+Maryland,Sykesville,Carroll,21784
+Maryland,Taneytown,Carroll,21787
+Maryland,Thurmont,Frederick,21788
+Maryland,Tuscarora,Frederick,21790
+Maryland,Union Bridge,Carroll,21791
+Maryland,Walkersville,Frederick,21793
+Maryland,West Friendship,Howard,21794
+Maryland,Williamsport,Washington,21795
+Maryland,Woodbine,Howard,21797
+Maryland,Woodsboro,Frederick,21798
+Maryland,Salisbury,Wicomico,21801
+Maryland,Salisbury,Wicomico,21802
+Maryland,Salisbury,Wicomico,21804
+Maryland,Allen,Wicomico,21810
+Maryland,Berlin,Worcester,21811
+Maryland,Bishopville,Worcester,21813
+Maryland,Bivalve,Wicomico,21814
+Maryland,Crisfield,Somerset,21817
+Maryland,Deal Island,Somerset,21821
+Maryland,Eden,Somerset,21822
+Maryland,Ewell,Somerset,21824
+Maryland,Fruitland,Wicomico,21826
+Maryland,Girdletree,Worcester,21829
+Maryland,Hebron,Wicomico,21830
+Maryland,Linkwood,Dorchester,21835
+Maryland,Mardela Springs,Wicomico,21837
+Maryland,Marion Station,Somerset,21838
+Maryland,Nanticoke,Wicomico,21840
+Maryland,Newark,Worcester,21841
+Maryland,Ocean City,Worcester,21842
+Maryland,Parsonsburg,Wicomico,21849
+Maryland,Pittsville,Wicomico,21850
+Maryland,Pocomoke City,Worcester,21851
+Maryland,Princess Anne,Somerset,21853
+Maryland,Quantico,Wicomico,21856
+Maryland,Sharptown,Wicomico,21861
+Maryland,Showell,Worcester,21862
+Maryland,Snow Hill,Worcester,21863
+Maryland,Stockton,Worcester,21864
+Maryland,Tyaskin,Wicomico,21865
+Maryland,Tylerton,Somerset,21866
+Maryland,Upper Fairmount,Somerset,21867
+Maryland,Vienna,Dorchester,21869
+Maryland,Westover,Somerset,21871
+Maryland,Whaleyville,Worcester,21872
+Maryland,Willards,Wicomico,21874
+Maryland,Delmar,Wicomico,21875
+Maryland,Westover,Somerset,21890
+Maryland,North East,Cecil,21901
+Maryland,Perry Point,Cecil,21902
+Maryland,Perryville,Cecil,21903
+Maryland,Port Deposit,Cecil,21904
+Maryland,Rising Sun,Cecil,21911
+Maryland,Warwick,Cecil,21912
+Maryland,Cecilton,Cecil,21913
+Maryland,Charlestown,Cecil,21914
+Maryland,Chesapeake City,Cecil,21915
+Maryland,Childs,Cecil,21916
+Maryland,Colora,Cecil,21917
+Maryland,Conowingo,Cecil,21918
+Maryland,Earleville,Cecil,21919
+Maryland,Elk Mills,Cecil,21920
+Maryland,Elkton,Cecil,21921
+Maryland,Georgetown,Cecil,21930

@@ -1,0 +1,11 @@
+# Time configurations to specify how far back to go
+history_days = 0
+history_weeks = 2
+history_months = 0
+
+# File path of zipcodes
+zipcodes_path = "./zipcodes.csv"
+
+# Api key and air quality setting for weather api
+api_key = "No you can't have my API key dummy"  # Enter an API key from weatherapi.com
+get_air_quality = "no"
