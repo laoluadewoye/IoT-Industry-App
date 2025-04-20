@@ -19,6 +19,8 @@ services:
     restart: unless-stopped
     depends_on:
       - mongo-db
+    ports:
+      - "8079:8079"
     environment:
       DB_HOST: mongo-db
       DB_PORT: 27017

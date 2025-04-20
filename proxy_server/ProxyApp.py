@@ -2,13 +2,15 @@ from pymongo import MongoClient
 from pymongo.database import Database, Collection
 from pymongo.errors import OperationFailure, CollectionInvalid, ConnectionFailure
 from pymongo.results import InsertOneResult
+from pymongo.cursor import Cursor
 from os import getenv
 from hashlib import sha256
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, Response
 from waitress import serve
 from time import time
 from datetime import datetime, UTC
 from ast import literal_eval
+import bson
 
 # Get core database environmental variables
 DB_HOST: str = getenv('DB_HOST')
@@ -37,7 +39,7 @@ app_sensor_tracker: dict[int, list] = {}
 app_sensor_mod: int = 20  # Calculated by sqrt(n), where n is the number of entries expected in the equation x + n/x
 
 
-def create_database():
+def create_database() -> None:
     # Create owner connection
     db_owner_password: str = open(DB_OWNER_PASSWORD_FILE).read()
     owner_conn_string: str = f'mongodb://{DB_OWNER}:{db_owner_password}@{DB_HOST}:{DB_PORT}/'
@@ -87,7 +89,7 @@ def create_database():
     owner_client.close()
 
 
-def create_database_test():
+def create_database_test() -> None:
     # Test
     global DB_HOST
     global DB_PORT
@@ -117,12 +119,12 @@ def create_database_test():
 
 def insert_into_sensor_tracker(sensor_name: str) -> bool:
     # Get the zipcode for sorting
-    sensor_info = sensor_name.split('_')
+    sensor_info: list[str] = sensor_name.split('_')
     sensor_zipcode: int = int(sensor_info[0])
 
     # Sort the zipcode into
-    sensor_already_existed = False
-    mod_location = sensor_zipcode % app_sensor_mod
+    sensor_already_existed: bool = False
+    mod_location: int = sensor_zipcode % app_sensor_mod
     if mod_location in app_sensor_tracker:
         if sensor_name in app_sensor_tracker[mod_location]:
             sensor_already_existed = True
@@ -135,9 +137,9 @@ def insert_into_sensor_tracker(sensor_name: str) -> bool:
 
 
 @app.route('/status', methods=['GET'])
-def status():
-    uptime_seconds = int(time() - APP_START_TIME)
-    status_info = {
+def status() -> tuple[Response, int]:
+    uptime_seconds: int = int(time() - APP_START_TIME)
+    status_info: dict = {
         'status': 'alive',
         'timestamp': datetime.now(UTC),
         'uptime_seconds': uptime_seconds,
@@ -146,7 +148,7 @@ def status():
 
 
 @app.route('/data_gen', methods=['POST'])
-def data_gen():
+def data_gen() -> tuple[Response, int]:
     # Access form fields from the POST request
     try:
         username: str = request.form.get('username')
@@ -178,7 +180,7 @@ def data_gen():
 
     # Access database on behalf of data generator
     try:
-        data_gen_conn_string = f'mongodb://{DATA_GEN}:{HASHED_DATA_GEN_PASSWORD}@{DB_HOST}:{DB_PORT}/weather'
+        data_gen_conn_string: str = f'mongodb://{DATA_GEN}:{HASHED_DATA_GEN_PASSWORD}@{DB_HOST}:{DB_PORT}/weather'
         data_gen_client: MongoClient = MongoClient(data_gen_conn_string, connectTimeoutMS=3000)
     except (ConnectionFailure, OperationFailure):
         msg: str = f'Authentication with MongoDB rejected.'
@@ -204,20 +206,20 @@ def data_gen():
                     'latitude': document['latitude'],
                     'longitude': document['longitude']
                 })
-            attempted_sensor_insert = True
+            attempted_sensor_insert: bool = True
         except OperationFailure:
             msg: str = f'Post request to do MongoDB insert operation with collection sensors failed.'
             return jsonify({'status': 'Error', 'message': msg}), 400
     else:
         sensor_result = None
-        attempted_sensor_insert = False
+        attempted_sensor_insert: bool = False
 
     if not exist_status and sensor_result is None and attempted_sensor_insert:
-        sensor_msg = f'Sensor {document["sensor_name"]} has been added to local cache and database.'
+        sensor_msg: str = f'Sensor {document["sensor_name"]} has been added to local cache and database.'
     elif not exist_status and sensor_result is not None and attempted_sensor_insert:
-        sensor_msg = f'Sensor {document["sensor_name"]} has been added to local cache but not database.'
+        sensor_msg: str = f'Sensor {document["sensor_name"]} has been added to local cache but not database.'
     else:
-        sensor_msg = f'Sensor {document["sensor_name"]} already exists in local cache.'
+        sensor_msg: str = f'Sensor {document["sensor_name"]} already exists in local cache.'
 
     # Return success
     msg: str = (
@@ -226,14 +228,12 @@ def data_gen():
         f'Document ID: {insert_result.inserted_id}.\n'
         f'Sensor Status: {sensor_msg}'
     )
-    return jsonify({'status': 'success', 'message': msg}), 201
+    return jsonify({'status': 'Success', 'message': msg}), 201
 
 
 @app.route('/web_app/<purpose>', methods=['GET'])
-def web_app(purpose):
-    print(request.args)
-
-    # Access form fields from the POST request
+def web_app(purpose: str) -> tuple[Response, int]:
+    # Access arg fields from the Get request
     try:
         username: str = request.args.get('username')
         password: str = request.args.get('password')
@@ -251,7 +251,35 @@ def web_app(purpose):
     if host != DB_HOST or port != DB_PORT:
         return jsonify({'status': 'Unauthorized', 'message': 'Invalid request: Invalid host or port.'}), 401
 
-    return jsonify({'status': 'success', 'message': f'sample web view message for {purpose}'}), 201
+    # Access database on behalf of data generator
+    try:
+        web_view_conn_string: str = f'mongodb://{WEB_VIEW}:{HASHED_WEB_VIEW_PASSWORD}@{DB_HOST}:{DB_PORT}/weather'
+        web_view_client: MongoClient = MongoClient(web_view_conn_string, connectTimeoutMS=3000)
+    except (ConnectionFailure, OperationFailure):
+        msg: str = f'Authentication with MongoDB rejected.'
+        return jsonify({'status': 'Unauthorized', 'message': msg}), 403
+
+    # Complete the desired operation
+    try:
+        if purpose == 'sensors':
+            cur_collection: Collection = web_view_client['weather']['sensors']
+            operation_result: list = cur_collection.find().to_list()
+            for document in operation_result:
+                document['_id'] = str(document['_id'])
+        else:
+            raise KeyError
+    except (TypeError, OperationFailure) as e:
+        msg: str = f'Get request to do MongoDB select operation of category {purpose} failed. Reason: {e}'
+        return jsonify({'status': 'Error', 'message': msg}), 400
+    except KeyError:
+        msg: str = (
+            f'Get request to do MongoDB select operation of category {purpose} failed. '
+            f'Invalid purpose for data generation API call.'
+        )
+        return jsonify({'status': 'Error', 'message': msg}), 400
+
+    msg: str = f'Get request to do MongoDB select operation of category {purpose} succeeded.'
+    return jsonify({'status': 'Success', 'message': msg, 'result': operation_result}), 200
 
 
 if __name__ == "__main__":

@@ -1,20 +1,17 @@
 import pandas as pd
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
+from streamlit_folium import st_folium
 from os import getenv
 from hashlib import sha256
 from requests import get, Response
+from folium import Map as FoliumMap, Marker as FoliumMarker, CircleMarker as FoliumCircleMarker, Icon as FoliumIcon
 
 # Get core database environmental variables
-local_defaults = {
-    'DB_HOST': 'localhost', 'DB_PORT': '8000', 'DB_USER': 'web_view',
-    'DB_PASSWORD_FILE': '../secrets/web_view_password.txt', 'PROXY_HOST': 'db-proxy-server', 'PROXY_PORT': '8079'
-}
-docker_defaults = {
+defaults = {
     'DB_HOST': 'mongo-db', 'DB_PORT': '27017', 'DB_USER': 'web_view',
     'DB_PASSWORD_FILE': '../secrets/web_view_password.txt', 'PROXY_HOST': 'localhost', 'PROXY_PORT': '8079'
 }
-defaults = docker_defaults
 
 DB_HOST: str = getenv('DB_HOST', defaults['DB_HOST'])
 DB_PORT: str = getenv('DB_PORT', defaults['DB_PORT'])
@@ -24,8 +21,8 @@ PROXY_HOST: str = getenv('PROXY_HOST', defaults['PROXY_HOST'])
 PROXY_PORT: str = getenv('PROXY_PORT', defaults['PROXY_PORT'])
 
 
-@st.cache_data(max_entries=2)
-def load_sensor_data() -> str:
+@st.cache_data(max_entries=5, ttl=60)
+def load_sensor_data() -> list[dict]:
     # Create password hash
     hashed_data_gen_password: str = sha256(open(DB_PASSWORD_FILE).read().encode()).hexdigest()
 
@@ -39,11 +36,12 @@ def load_sensor_data() -> str:
 
     # Send a get request to the proxy server
     response: Response = get(f'http://{PROXY_HOST}:{PROXY_PORT}/web_app/sensors', params=content, timeout=10)
-    return response.content.decode()
+    return response.json()['result']
 
-@st.fragment
+
+@st.fragment(run_every=10)
 def create_filter_settings() -> None:
-    st.header('Filter Settings')
+    st.title('Filter Settings')
 
     # Selection for which sensors to view
     st.subheader('Select Location Setting')
@@ -55,9 +53,19 @@ def create_filter_settings() -> None:
     )
 
     # Select the sensors if 'selected' is selected
-    if st.session_state['all_or_selected'] == 'Selected Options':
-        st.subheader('Select Sensors to View')
-        st.write(load_sensor_data())
+    st.subheader('Select Sensors to View')
+
+    # Get data and save information to session state and sensor list
+    sensor_data: list[dict] = load_sensor_data()
+    st.session_state['sensor_dict']: dict = {document['sensor_name']: document['_id'] for document in sensor_data}
+    sensor_list: list[str] = [document['sensor_name'] for document in sensor_data]
+
+    # Create dropdown
+    selected_sensors_disabled: bool = all_or_selected == 'Selected Options'
+    selected_sensors = st.multiselect(
+        'Select Sensors', sensor_list, default=sensor_list[0], key='selected_sensors',
+        disabled=selected_sensors_disabled
+    )
 
     # Select what units you wish to use
     st.subheader('Select Unit of Measurement')
@@ -69,8 +77,65 @@ def create_filter_settings() -> None:
     )
 
 
+@st.fragment(run_every=3)
+def create_sensor_map(sensor_df: pd.DataFrame) -> st.map:
+    # Create the map around the DMV
+    vienna_coordinates = [38.900692, -77.270946]
+    sensor_map_folium: FoliumMap = FoliumMap(vienna_coordinates, zoom_start=8)
+
+    # Add markers for each sensor
+    for index, row in sensor_df.iterrows():
+        # Create the popup information
+        popup_text: str = f'Sensor Name: {row["Sensor Name"]}'
+
+        # Differentiate the marker based on what is selected
+        selected: bool = (
+            st.session_state['all_or_selected'] == 'All' or
+            row['Sensor Name'] in st.session_state['selected_sensors']
+        )
+
+        # Add new marker to the map
+        if selected:
+            new_marker = FoliumMarker(
+                [row['Latitude'], row['Longitude']],
+                popup=popup_text,
+                icon=FoliumIcon(color='red'),
+            )
+        else:
+            new_marker = FoliumCircleMarker(
+                [row['Latitude'], row['Longitude']],
+                popup=popup_text,
+                color='blue',
+                opacity=0.1,
+                fill_color='blue',
+                fill_opacity=0.1,
+            )
+        new_marker.add_to(sensor_map_folium)
+
+    # Create a streamlit map object with folium extension
+    sensor_map_st: st.map = st_folium(sensor_map_folium, use_container_width=True, key='sensor_map')
+
+    return sensor_map_st
+
+
 def create_sensor_tab() -> None:
-    st.write('Sensor Data')
+    st.title('Sensor Summary')
+
+    # Get data for the table
+    sensor_data = load_sensor_data()
+    sensor_list = [
+        [document['_id'], document['sensor_name'], document['latitude'], document['longitude']]
+        for document in sensor_data
+    ]
+
+    # Create the dataframe and display the table
+    st.subheader('Sensor Table')
+    sensor_df = pd.DataFrame(sensor_list, columns=['Mongo ID', 'Sensor Name', 'Latitude', 'Longitude'])
+    st.dataframe(sensor_df)
+
+    # Create a map of the sensors
+    st.subheader('Sensor Map')
+    sensor_map: st = create_sensor_map(sensor_df)
 
 
 def create_real_time_tab() -> None:
@@ -83,23 +148,16 @@ def create_historical_tab() -> None:
 
 # Create initial settings and title
 st.set_page_config(layout='wide')
-# st_autorefresh(interval=5000, key='auto_refresh')
 st.title('Weather Data Dashboard')
-
-# Print environmental variables
-st.write(f'DB_HOST: {DB_HOST}')
-st.write(f'DB_PORT: {DB_PORT}')
-st.write(f'DB_USER: {DB_USER}')
-st.write(f'DB_PASSWORD_FILE: {DB_PASSWORD_FILE}')
-st.write(f'PROXY_HOST: {PROXY_HOST}')
-st.write(f'PROXY_PORT: {PROXY_PORT}')
 
 # Create a sidebar
 with st.sidebar:
     create_filter_settings()
 
 # Create tabs
-sensor_tab, real_time_tab, historical_tab = st.tabs(['Sensor Data', 'Real Time Data', 'Historical Data'])
+sensor_tab, real_time_tab, historical_tab = st.tabs(
+    ['Sensor Information', 'Real Time Information', 'Historical Information']
+)
 
 with sensor_tab:
     create_sensor_tab()
