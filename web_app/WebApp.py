@@ -6,6 +6,7 @@ from hashlib import sha256
 from requests import get, Response
 from folium import Map as FoliumMap, Marker as FoliumMarker, CircleMarker as FoliumCircleMarker, Icon as FoliumIcon
 from typing import Union
+from collections import Counter
 
 # Get core database environmental variables
 defaults = {
@@ -91,15 +92,9 @@ def create_filter_settings() -> None:
     )
 
     if metric_or_customary == 'Metric':
-        st.session_state['unit_modifiers'] = {
-            'Humidity': '%', 'Precipitation': 'mm', 'Pressure': 'mb', 'Temperature': '°C', 'UV Index': 'uvi',
-            'Wind Degree': '°', 'Wind Speed': 'kph'
-        }
+        st.session_state['unit_modifiers'] = ['%', 'mm', 'mb', '°C', 'uvi', '°', '', 'kph']
     else:
-        st.session_state['unit_modifiers'] = {
-            'Humidity': '%', 'Precipitation': 'in', 'Pressure': 'inHg', 'Temperature': '°F', 'UV Index': 'uvi',
-            'Wind Degree': '°', 'Wind Speed': 'mph'
-        }
+        st.session_state['unit_modifiers'] = ['%', 'in', 'inHg', '°F', 'uvi', '°', '', 'mph']
 
     # Selection for which sensors to view
     st.subheader('Select Location Setting')
@@ -197,21 +192,71 @@ def create_sensor_tab() -> None:
     sensor_map: st = create_sensor_map()
 
 
-@st.fragment(run_every=3)
-def create_real_time_data_containers(metric_package) -> None:
+def create_real_time_data_container(real_time_data: dict[str, list], metric_package: zip) -> None:
     # Create container
+    with st.container(border=True, key='real_time_data_container'):
+        # Create columns to place information in
+        col1, col2, col3 = st.columns(3, gap='medium')
+        col4, col5, col6 = st.columns(3, gap='medium')
+        _, col7, _ = st.columns(3, gap='medium')
 
-    for metric_key, metric_name, metric_modifier in metric_package:
-        ...
+        # Loop through all the metrics
+        columns = [col1, col2, col3, col4, col5, col6, col7]
+        column_index = 0
+        for metric_key, metric_name, metric_modifier in metric_package:
+            if metric_name == 'Wind Direction':
+                continue
+            elif metric_name == 'Wind Degrees':
+                # Summarize the data
+                metric_data = real_time_data[metric_key]
+                metric_total = sum(document['latest_value'] for document in metric_data)
+                metric_avg = round(metric_total / len(metric_data), 2)
+
+                # Create delta
+                delta_data = real_time_data['wind_dir']
+                delta_total = [document['latest_value'] for document in delta_data]
+                delta_mode = Counter(delta_total).most_common(1)[0][0]
+
+                # Create metric
+                columns[column_index].metric(metric_name, f'{metric_avg}{metric_modifier}', delta_mode)
+            else:
+                # Summarize the data
+                metric_data = real_time_data[metric_key]
+                metric_total = sum(document['latest_value'] for document in metric_data)
+                metric_avg = round(metric_total / len(metric_data), 2)
+
+                # Create metric
+                columns[column_index].metric(metric_name, f'{metric_avg}{metric_modifier}')
+
+            # Move to next column object
+            column_index += 1
 
 
+@st.fragment(run_every=3)
 def create_real_time_tab() -> None:
     st.title('Latest Real Time Analytics')
     st.text('This section provides real time summaries for the selected weather sensors in the database.')
 
+    # Create a header for the real time data
+    if st.session_state['all_or_selected'] == 'All':
+        st.header('The Latest Real-Time Data for All Sensors')
+    else:
+        st.header('The Latest Real-Time Data for Selected Sensors')
+
+        # Create additional text
+        selected_sensor_cities = st.session_state['sensor_df'][
+            st.session_state['sensor_df']['Sensor Name'].isin(st.session_state['selected_sensors'])
+        ]['City'].to_list()
+        if len(selected_sensor_cities) > 3:
+            cities_str = ', '.join(selected_sensor_cities[:3])
+            st.text(f'The averages are calculated from {cities_str}, '
+                    f'and {len(selected_sensor_cities) - 3} other locations.')
+        else:
+            cities_str = ', '.join(selected_sensor_cities)
+            st.text(f'The averages are calculated from {cities_str[:-2]}.')
+
     # Get data for boxes
     real_time_data: dict[str, list] = load_real_time_data()
-    st.write(real_time_data)
 
     # Create metrics
     metric_keys = list(real_time_data.keys())
@@ -219,8 +264,8 @@ def create_real_time_tab() -> None:
         'Humidity', 'Precipitation', 'Pressure', 'Temperature', 'UV Index', 'Wind Degrees', 'Wind Direction',
         'Wind Speed'
     ]
-    metric_modifiers = list(st.session_state['unit_modifiers'].values())
-    create_real_time_data_containers(zip(metric_keys, generic_metric_names, metric_modifiers))
+    metric_modifiers = list(st.session_state['unit_modifiers'])
+    create_real_time_data_container(real_time_data, zip(metric_keys, generic_metric_names, metric_modifiers))
 
 
 def create_historical_tab() -> None:
