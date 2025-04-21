@@ -17,7 +17,7 @@ PROXY_HOST: str = getenv('PROXY_HOST')
 PROXY_PORT: str = getenv('PROXY_PORT')
 
 
-def row_to_dict(row: pd.Series) -> dict:
+def row_to_dict(row: pd.Series, time_recorded: str) -> dict:
     # Define which columns to split out
     id_cols: list[str] = [
         'sensor_name', 'time_recorded', 'latitude', 'longitude',
@@ -42,7 +42,7 @@ def row_to_dict(row: pd.Series) -> dict:
                 sub_dict[key] = sub_dict[key].item()
 
         # Add an updated datetime object
-        sub_dict['time_recorded'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        sub_dict['time_recorded'] = time_recorded
 
         # Add to super-dictionary
         super_dict[metric] = sub_dict
@@ -76,6 +76,9 @@ def read_in_data():
 
     while True:
         for sensor_name in unique_sensors:
+            # Create a timestamp for the round of sensor data
+            time_recorded: str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
             # Get the first id of the sensor
             try:
                 sensor_df: pd.DataFrame = data_df[data_df["sensor_name"] == sensor_name]
@@ -89,7 +92,7 @@ def read_in_data():
             data_df = data_df.drop(first_id, axis=0).reset_index(drop=True)
 
             # Turn it into a super-dictionary
-            popped_row_set: dict[str, dict] = row_to_dict(popped_row)
+            popped_row_set: dict[str, dict] = row_to_dict(popped_row, time_recorded)
 
             # Send it to the database
             for metric, metric_dict in popped_row_set.items():

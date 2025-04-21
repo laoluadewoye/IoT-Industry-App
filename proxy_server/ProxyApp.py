@@ -282,16 +282,10 @@ def get_historical_measurements(client: MongoClient, measurements: list[str], al
     for measurement in measurements:
         # Create the measurement pipeline based on filter settings
         if all_or_selected in ['All', 'Empty'] or 'Empty' in selected_sensors:
-            # measurement_pipeline: list = [
-            #     {'$match': {'time_recorded': {'$gte': start_date_time, '$lte': end_date_time}}},
-            #     {'$sort': {'time_recorded': -1}},
-            #     {'$project': {'sensor_name': 1, 'time_recorded': 1}},
-            #     {'$group': {'_id': '$sensor_name'}}
-            # ]
             measurement_pipeline: list = [
                 {'$match': {'time_recorded': {'$gte': start_date_time, '$lte': end_date_time}}},
                 {'$sort': {'time_recorded': -1}},
-                {'$project': {'_id': 0, 'sensor_name': 1, 'time_recorded': 1, 'metric': 1}},
+                {'$project': {'_id': 0, 'sensor_name': 1, 'county': 1, 'time_recorded': 1, 'metric': 1}}
             ]
         else:
             measurement_pipeline: list = [
@@ -300,15 +294,15 @@ def get_historical_measurements(client: MongoClient, measurements: list[str], al
                     'time_recorded': {'$gte': start_date_time, '$lte': end_date_time}
                 }},
                 {'$sort': {'time_recorded': -1}},
-                {'$project': {'_id': 0, 'sensor_name': 1, 'time_recorded': 1, 'metric': 1}},
+                {'$project': {'_id': 0, 'sensor_name': 1, 'county': 1, 'time_recorded': 1, 'metric': 1}}
             ]
 
         # Use aggregate pipeline to get the latest recorded value for each sensor
         cur_collection: Collection = client['weather'][measurement]
-        historical_record: list[dict] = cur_collection.aggregate(measurement_pipeline, allowDiskUse=True).to_list()
+        historical_records: list[dict] = cur_collection.aggregate(measurement_pipeline, allowDiskUse=True).to_list()
 
         # Save the list of results to super dictionary
-        historical_measurements[measurement] = historical_record
+        historical_measurements[measurement] = historical_records
 
     return historical_measurements
 
