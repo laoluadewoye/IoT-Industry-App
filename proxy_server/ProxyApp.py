@@ -272,6 +272,47 @@ def get_latest_measurements(client: MongoClient, measurements: list[str], all_or
     return latest_measurements
 
 
+def get_historical_measurements(client: MongoClient, measurements: list[str], all_or_selected: str,
+                                selected_sensors: list[str], start_date_time: datetime,
+                                end_date_time: datetime) -> dict[str, list]:
+    # Start measurement super dictionary
+    historical_measurements: dict[str, list] = {}
+
+    # Get a list of the latest measurement for each sensor for each measurement
+    for measurement in measurements:
+        # Create the measurement pipeline based on filter settings
+        if all_or_selected in ['All', 'Empty'] or 'Empty' in selected_sensors:
+            # measurement_pipeline: list = [
+            #     {'$match': {'time_recorded': {'$gte': start_date_time, '$lte': end_date_time}}},
+            #     {'$sort': {'time_recorded': -1}},
+            #     {'$project': {'sensor_name': 1, 'time_recorded': 1}},
+            #     {'$group': {'_id': '$sensor_name'}}
+            # ]
+            measurement_pipeline: list = [
+                {'$match': {'time_recorded': {'$gte': start_date_time, '$lte': end_date_time}}},
+                {'$sort': {'time_recorded': -1}},
+                {'$project': {'_id': 0, 'sensor_name': 1, 'time_recorded': 1, 'metric': 1}},
+            ]
+        else:
+            measurement_pipeline: list = [
+                {'$match': {
+                    'sensor_name': {'$in': selected_sensors},
+                    'time_recorded': {'$gte': start_date_time, '$lte': end_date_time}
+                }},
+                {'$sort': {'time_recorded': -1}},
+                {'$project': {'_id': 0, 'sensor_name': 1, 'time_recorded': 1, 'metric': 1}},
+            ]
+
+        # Use aggregate pipeline to get the latest recorded value for each sensor
+        cur_collection: Collection = client['weather'][measurement]
+        historical_record: list[dict] = cur_collection.aggregate(measurement_pipeline, allowDiskUse=True).to_list()
+
+        # Save the list of results to super dictionary
+        historical_measurements[measurement] = historical_record
+
+    return historical_measurements
+
+
 @app.route('/web_app', methods=['GET'])
 def web_app() -> tuple[Response, int]:
     # Access arg fields from the Get request
@@ -283,10 +324,21 @@ def web_app() -> tuple[Response, int]:
         host: str = json_content['host']
         port: str = json_content['port']
 
+        # Get filters if desired
         if purpose != 0:
             filters: Union[dict, None] = json_content['filters']
         else:
             filters: Union[dict, None] = None
+
+        # Get time range if desired
+        if purpose == 2:
+            time_range: Union[dict, None] = json_content['time_range']
+            time_range['start_date_time'] = datetime.strptime(time_range['start_date_time'], '%Y-%m-%d %H:%M:%S')
+            time_range['start_date_time'] = time_range['start_date_time'].replace(tzinfo=UTC)
+            time_range['end_date_time'] = datetime.strptime(time_range['end_date_time'], '%Y-%m-%d %H:%M:%S')
+            time_range['end_date_time'] = time_range['end_date_time'].replace(tzinfo=UTC)
+        else:
+            time_range: Union[dict, None] = None
     except KeyError as e:
         return jsonify({'status': 'Error', 'message': f'Invalid request: Missing Form Field. {e}'}), 400
     except (ValueError, SyntaxError) as e:
@@ -310,35 +362,38 @@ def web_app() -> tuple[Response, int]:
         return jsonify({'status': 'Unauthorized', 'message': msg}), 403
 
     # Complete the desired operation
+    operation_result: Union[dict, list] = {'I am': 'a teapot'}
     try:
-        # Only do if the purpose is for sensor information retrieval
-        if purpose == 0:
+        if purpose not in [0, 1, 2]:  # Make sure the purpose is valid
+            raise KeyError(f'Purpose {purpose} is not a valid purpose setting.')
+        elif purpose == 0:  # Only do if the purpose is for sensor information retrieval
             cur_collection: Collection = web_view_client['weather']['sensors']
             operation_result: Union[dict, list] = cur_collection.find().to_list()
             for document in operation_result:
                 document['_id'] = str(document['_id'])
-
-        # Only do if the purpose is for real-time information retrieval
-        if purpose == 1:
+        elif purpose == 1:  # Only do if the purpose is for real-time information retrieval
             # Select the measurement system to use
             if filters['metric_or_customary'] in ['Metric', 'Empty']:
                 cur_measurements: list[str] = METRIC_MEASUREMENTS
             else:
                 cur_measurements: list[str] = CUSTOMARY_MEASUREMENTS
 
-            # Cycle through all sensors
+            # Obtain real-time data
             operation_result: Union[dict, list] = get_latest_measurements(
                 web_view_client, cur_measurements, filters['all_or_selected'], filters['selected_sensors']
             )
+        elif purpose == 2:  # Only do if the purpose is for historical information retrieval
+            # Select the measurement system to use
+            if filters['metric_or_customary'] in ['Metric', 'Empty']:
+                cur_measurements: list[str] = METRIC_MEASUREMENTS
+            else:
+                cur_measurements: list[str] = CUSTOMARY_MEASUREMENTS
 
-        # TODO: Add historical retrieval
-        # Only do if the purpose is for historical information retrieval
-        if purpose == 2:
-            operation_result: Union[dict, list] = {'I am': 'a teapot'}
-
-        # Make sure the purpose is valid
-        if purpose not in [0, 1, 2]:
-            raise KeyError
+            # Obtain historical data
+            operation_result: Union[dict, list] = get_historical_measurements(
+                web_view_client, cur_measurements, filters['all_or_selected'], filters['selected_sensors'],
+                time_range['start_date_time'], time_range['end_date_time']
+            )
     except (TypeError, OperationFailure) as e:
         msg: str = f'Get request to do MongoDB select operation of category {purpose} failed. Reason: {e}'
         return jsonify({'status': 'Error', 'message': msg}), 400

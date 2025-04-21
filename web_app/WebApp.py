@@ -7,6 +7,7 @@ from requests import get, Response
 from folium import Map as FoliumMap, Marker as FoliumMarker, CircleMarker as FoliumCircleMarker, Icon as FoliumIcon
 from typing import Union
 from collections import Counter
+from datetime import datetime, timedelta
 
 # Get core database environmental variables
 defaults: dict[str, str] = {
@@ -35,7 +36,7 @@ def load_data(content: dict[str, str]) -> Union[dict[str, list], list[dict], Non
     return response.json()['result']
 
 
-@st.cache_data(max_entries=3, ttl=10)
+@st.cache_data(ttl=9)
 def load_sensor_data() -> Union[list[dict], None]:
     # Create password hash
     hashed_data_gen_password: str = sha256(open(DB_PASSWORD_FILE).read().encode()).hexdigest()
@@ -78,10 +79,50 @@ def load_real_time_data() -> Union[dict[str, list], None]:
     return load_data(content)
 
 
+def load_historical_data() -> Union[dict[str, list], None]:
+    # Create password hash
+    hashed_data_gen_password: str = sha256(open(DB_PASSWORD_FILE).read().encode()).hexdigest()
+
+    # Obtain filters with default handling
+    all_or_selected_filter: str = st.session_state.get('all_or_selected', 'Empty')
+    selected_sensors_filter: str = st.session_state.get('selected_sensors', ['Empty'])
+    metric_or_customary_filter: str = st.session_state.get('metric_or_customary', 'Empty')
+
+    # Obtain time range with default handling (5 minute default)
+    end_date_time_filter: Union[datetime, str] = st.session_state.get('end_date_time', datetime.now())
+    start_date_time_filter: Union[datetime, str] = st.session_state.get(
+        'start_date_time', end_date_time_filter - timedelta(minutes=5)
+    )
+
+    end_date_time_filter = end_date_time_filter.strftime('%Y-%m-%d %H:%M:%S')
+    start_date_time_filter = start_date_time_filter.strftime('%Y-%m-%d %H:%M:%S')
+
+    # Create message content
+    content: dict = {
+        'purpose': 2,
+        'username': DB_USER,
+        'password': hashed_data_gen_password,
+        'host': DB_HOST,
+        'port': DB_PORT,
+        'filters': {
+            'metric_or_customary': metric_or_customary_filter,
+            'all_or_selected': all_or_selected_filter,
+            'selected_sensors': selected_sensors_filter
+        },
+        'time_range': {
+            'start_date_time': start_date_time_filter,
+            'end_date_time': end_date_time_filter
+        }
+    }
+
+    return load_data(content)
+
+
 @st.fragment
 def create_filter_settings() -> None:
     st.title('Filter Settings')
     st.text('Use this sidebar to choose what sensors you wish to examine.')
+    st.text('Scroll down to view additional settings such as time ranges.')
 
     # Select what measurement system you wish to use
     st.subheader('Select Measurement System')
@@ -108,8 +149,7 @@ def create_filter_settings() -> None:
 
     # Select the sensors if 'selected' is selected
     st.subheader('Select Sensors to View')
-    if all_or_selected == 'All':
-        st.text('To use this feature, select "Selected Options" above.')
+    st.text('To use this feature, select "Selected Options" above.')
 
     # Get data and save information to session state and sensor list
     sensor_data: Union[list[dict], None] = load_sensor_data()
@@ -124,6 +164,52 @@ def create_filter_settings() -> None:
         'Select Sensors', sensor_list, default=sensor_list[0], disabled=selected_sensors_disabled,
         key='selected_sensors',
     )
+
+    # Select the time range for historical and anomaly tabs
+    st.subheader('Select Time Range')
+    st.text('This feature is for viewing historical data and anomaly alerts.')
+
+    date_time_range_choice = st.radio(
+        "Select the range of data you want to view:",
+        [
+            'Last 5 Minutes', 'Last Half Hour', 'Last Hour', 'Last 5 Hours',
+            'Last Day', 'Last Week', 'Last Month', 'Custom Range'
+        ],
+        horizontal=True,
+        key="date_time_range_choice"
+    )
+    custom_time_disabled: bool = date_time_range_choice != 'Custom Range'
+
+    st.subheader('Select Time Range: Start Information')
+    st.text('To use this feature, select "Custom Range" above.')
+    custom_start_date = st.date_input(
+        'Select Start Date:', 'today', disabled=custom_time_disabled, key='custom_start_date'
+    )
+    custom_start_time = st.time_input(
+        'Select Start Time:', '00:00', disabled=custom_time_disabled, key='custom_start_time'
+    )
+
+    st.subheader('Select Time Range: End Information')
+    st.text('To use this feature, select "Custom Range" above.')
+    custom_end_date = st.date_input('Select End Date:', 'today', disabled=custom_time_disabled, key='custom_end_date')
+    custom_end_time = st.time_input('Select End Time:', '23:59', disabled=custom_time_disabled, key='custom_end_time')
+
+    end_date_time = datetime.now()
+    if date_time_range_choice != 'Custom Range':
+        default_deltas = {
+            'Last 5 Minutes': timedelta(minutes=5),
+            'Last Half Hour': timedelta(hours=0.5),
+            'Last Hour': timedelta(hours=1),
+            'Last 5 Hours': timedelta(hours=5),
+            'Last Day': timedelta(days=1),
+            'Last Week': timedelta(days=7),
+            'Last Month': timedelta(days=30)
+        }
+        st.session_state['start_date_time'] = end_date_time - default_deltas[date_time_range_choice]
+        st.session_state['end_date_time'] = end_date_time
+    else:
+        st.session_state['start_date_time'] = datetime.combine(custom_start_date, custom_start_time)
+        st.session_state['end_date_time'] = datetime.combine(custom_end_date, custom_end_time)
 
 
 @st.fragment(run_every=3)
@@ -275,8 +361,69 @@ def create_real_time_tab() -> None:
         create_real_time_data_container(real_time_data, zip(metric_keys, generic_metric_names, metric_modifiers))
 
 
+def find_county_name(name: str) -> str:
+    return st.session_state['sensor_df'][st.session_state['sensor_df']['Sensor Name'] == name]['County'].values[0]
+
+
+def create_time_charts(historical_data: dict[str, list], metric_package: zip, sensor_desc: str) -> None:
+    for metric_key, metric_name, metric_modifier in metric_package:
+        if metric_name == 'Wind Direction':
+            ...
+        else:
+            # Create dataframe
+            historical_df: pd.DataFrame = pd.DataFrame(historical_data[metric_key])
+            historical_df['time_recorded'] = pd.to_datetime(historical_df['time_recorded'], utc=True)
+            historical_df['time_recorded_est'] = historical_df['time_recorded'].dt.tz_convert('US/Eastern')
+            sensor_names: list = historical_df['sensor_name'].unique().tolist()
+
+            # Create pivot table
+            if len(sensor_names) > 25:
+                historical_df['county'] = historical_df['sensor_name'].map(lambda name: find_county_name(name))
+                historical_df_grouped = historical_df.groupby(['county', 'time_recorded'])
+                historical_df_avg = historical_df_grouped['metric'].mean().reset_index()
+                historical_df_pivot = historical_df_avg.pivot(index='time_recorded', columns='county', values='metric')
+            else:
+                historical_df_pivot = historical_df.pivot(index='time_recorded', columns='sensor_name', values='metric')
+
+            # Create line chart
+            # TODO: Use the sensor description as the title
+            start_date_str: str = st.session_state['start_date_time'].strftime("%d %b %Y, %I:%M%p")
+            end_date_str: str = st.session_state['end_date_time'].strftime("%d %b %Y, %I:%M%p")
+            st.subheader(f'Historical Air Pressure Data from {start_date_str} to {end_date_str}.')
+            st.line_chart(historical_df_pivot, x_label='Date & Time', y_label=f'{metric_name} ({metric_modifier})')
+
+
+@st.fragment(run_every=3)
 def create_historical_tab() -> None:
-    st.write('Historical Data')
+    st.title('Historical Weather Data')
+    st.text('This section provides time-based charts showing the evolution of weather statistics.')
+
+    # Create a description of the focused sensors for the historical data
+    if st.session_state['all_or_selected'] == 'All':
+        sensor_desc: str = 'All Sensors'
+    else:
+        selected_sensor_cities: list[str] = st.session_state['sensor_df'][
+            st.session_state['sensor_df']['Sensor Name'].isin(st.session_state['selected_sensors'])
+        ]['City'].to_list()
+
+        if len(selected_sensor_cities) > 3:
+            cities_str: str = ', '.join(selected_sensor_cities[:3])
+            sensor_desc: str = f'{cities_str}, and {len(selected_sensor_cities) - 3} other locations.'
+        else:
+            cities_str: str = ', '.join(selected_sensor_cities)
+            sensor_desc: str = f'{cities_str[:-2]}.'
+
+    # Get the historical data
+    historical_data: dict[str, list] = load_historical_data()
+    if historical_data is not None:
+        # Create metrics
+        metric_keys: list[str] = list(historical_data.keys())
+        generic_metric_names: list[str] = [
+            'Humidity', 'Precipitation', 'Pressure', 'Temperature', 'UV Index', 'Wind Degrees', 'Wind Direction',
+            'Wind Speed'
+        ]
+        metric_modifiers: list[str] = list(st.session_state['unit_modifiers'])
+        create_time_charts(historical_data, zip(metric_keys, generic_metric_names, metric_modifiers), sensor_desc)
 
 
 def create_anomaly_tab() -> None:

@@ -1,4 +1,4 @@
-name: greenhouse-climate-app
+name: maryland-climate-app
 services:
   mongo-db:
     image: mongo
