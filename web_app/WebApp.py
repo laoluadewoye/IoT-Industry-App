@@ -354,7 +354,7 @@ def create_real_time_tab() -> None:
         # Create metrics
         metric_keys: list[str] = list(real_time_data.keys())
         generic_metric_names: list[str] = [
-            'Humidity', 'Precipitation', 'Pressure', 'Temperature', 'UV Index', 'Wind Degrees', 'Wind Direction',
+            'Humidity', 'Precipitation', 'Air Pressure', 'Temperature', 'UV Index', 'Wind Degrees', 'Wind Direction',
             'Wind Speed'
         ]
         metric_modifiers: list[str] = list(st.session_state['unit_modifiers'])
@@ -374,8 +374,8 @@ def create_time_charts(historical_data: dict[str, list], metric_package: zip) ->
         start_date_str: Union[datetime, str] = st.session_state['start_date_time'] - timedelta(hours=4)
         end_date_str: Union[datetime, str] = st.session_state['end_date_time'] - timedelta(hours=4)
 
-        start_date_str: str = start_date_str.strftime("%d %b %Y, %I:%M%p")
-        end_date_str: str = end_date_str.strftime("%d %b %Y, %I:%M%p")
+        start_date_str = start_date_str.strftime("%d %b %Y, %I:%M%p")
+        end_date_str = end_date_str.strftime("%d %b %Y, %I:%M%p")
 
         st.subheader(f'Historical {metric_name} Data from {start_date_str} to {end_date_str}.')
 
@@ -437,15 +437,122 @@ def create_historical_tab() -> None:
         # Create metrics
         metric_keys: list[str] = list(historical_data.keys())
         generic_metric_names: list[str] = [
-            'Humidity', 'Precipitation', 'Pressure', 'Temperature', 'UV Index', 'Wind Degrees', 'Wind Direction',
+            'Humidity', 'Precipitation', 'Air Pressure', 'Temperature', 'UV Index', 'Wind Degrees', 'Wind Direction',
             'Wind Speed'
         ]
         metric_modifiers: list[str] = list(st.session_state['unit_modifiers'])
         create_time_charts(historical_data, zip(metric_keys, generic_metric_names, metric_modifiers))
 
 
+def create_anomaly_setting_widget(title: str, generic: bool, **kwargs) -> None:
+    with st.popover(title):
+        if generic:
+            # Get parameters
+            generic_unit: str = kwargs['generic_unit']
+            generic_min: Union[int, float] = kwargs['generic_min']
+            generic_max: Union[int, float] = kwargs['generic_max']
+            generic_key: str = kwargs['generic_key']
+
+            # Create widget
+            temp_col1, temp_col2 = st.columns(2)
+            with temp_col1:
+                min_unit_generic = st.number_input(f'Min {generic_unit}', value=generic_min, key=f'min_{generic_key}')
+            with temp_col2:
+                max_unit_generic = st.number_input(f'Max {generic_unit}', value=generic_max, key=f'max_{generic_key}')
+        else:
+            # Get parameters
+            metric_unit: str = kwargs['metric_unit']
+            metric_min: Union[int, float] = kwargs['metric_min']
+            metric_max: Union[int, float] = kwargs['metric_max']
+            metric_key: str = kwargs['metric_key']
+
+            customary_unit: str = kwargs['customary_unit']
+            customary_min: Union[int, float] = kwargs['customary_min']
+            customary_max: Union[int, float] = kwargs['customary_max']
+            customary_key: str = kwargs['customary_key']
+
+            # Create widget
+            temp_col1, temp_col2 = st.columns(2)
+            with temp_col1:
+                min_unit_metric = st.number_input(
+                    f'Min {metric_unit}',
+                    value=metric_min,
+                    disabled=st.session_state['metric_or_customary'] != 'Metric',
+                    key=f'min_{metric_key}'
+                )
+                max_unit_metric = st.number_input(
+                    f'Max {metric_unit}',
+                    value=metric_max,
+                    disabled=st.session_state['metric_or_customary'] != 'Metric',
+                    key=f'max_{metric_key}'
+                )
+            with temp_col2:
+                min_unit_customary = st.number_input(
+                    f'Min {customary_unit}', value=customary_min,
+                    disabled=st.session_state['metric_or_customary'] != 'Customary', key=f'min_{customary_key}'
+                )
+                max_unit_customary = st.number_input(
+                    f'Max {customary_unit}', value=customary_max,
+                    disabled=st.session_state['metric_or_customary'] != 'Customary', key=f'max_{customary_key}'
+                )
+
+
+@st.fragment(run_every=3)
+def create_anomaly_settings() -> None:
+    anomaly_col1, anomaly_col2, anomaly_col3, anomaly_col4, anomaly_col5, anomaly_col6 = st.columns(6)
+    with anomaly_col1:
+        create_anomaly_setting_widget(
+            'Humidity Settings', generic=True, generic_unit='Percentage', generic_min=0, generic_max=100,
+            generic_key='humidity'
+        )
+    with anomaly_col2:
+        create_anomaly_setting_widget(
+            'Precipitation Settings', generic=False, metric_unit='Millimeters', metric_min=0, metric_max=500,
+            metric_key='precip_mm', customary_unit='Inches', customary_min=0, customary_max=20,
+            customary_key='precip_in'
+        )
+    with anomaly_col3:
+        create_anomaly_setting_widget(
+            'Air Pressure Settings', generic=False, metric_unit='Millibars', metric_min=0, metric_max=2000,
+            metric_key='pressure_mb', customary_unit='Inches', customary_min=0, customary_max=60,
+            customary_key='pressure_in'
+        )
+    with anomaly_col4:
+        create_anomaly_setting_widget(
+            'Temperature Settings', generic=False, metric_unit='Celsius', metric_min=0, metric_max=100,
+            metric_key='temp_c', customary_unit='Fahrenheit', customary_min=32, customary_max=212,
+            customary_key='temp_f'
+        )
+    with anomaly_col5:
+        create_anomaly_setting_widget(
+            'UV Index Settings', generic=True, generic_unit='UV Index Score', generic_min=0, generic_max=11,
+            generic_key='uv_index_score'
+        )
+    with anomaly_col6:
+        create_anomaly_setting_widget(
+            'Wind Speed Settings', generic=False, metric_unit='Meters per Second', metric_min=0, metric_max=500,
+            metric_key='wind_kph', customary_unit='Miles per Hour', customary_min=0, customary_max=311,
+            customary_key='wind_mph'
+        )
+
+
+@st.fragment(run_every=3)
+def display_any_anomolies() -> None:
+    # Get the historical data
+    historical_data: dict[str, list] = load_historical_data()
+    st.write(historical_data)
+
+
 def create_anomaly_tab() -> None:
-    st.write('Anomaly Data')
+    st.title('Anomaly Tracker')
+    st.text('This section scans historical data for anomalies based on settings below.')
+    st.text('Ranges you select are inclusive of edge numbers.')
+
+    # Create settings to look for anomalies
+    create_anomaly_settings()
+
+    # Look for anomalies
+    display_any_anomolies()
 
 
 # Create initial settings and title
