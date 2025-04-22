@@ -3,7 +3,6 @@ from pymongo.database import Database, Collection
 from pymongo.errors import OperationFailure, CollectionInvalid, ConnectionFailure
 from pymongo.results import InsertOneResult
 from os import getenv
-import sys
 from hashlib import sha256
 from flask import Flask, jsonify, request, Response
 from waitress import serve
@@ -403,9 +402,6 @@ def web_app() -> tuple[Response, int]:
 
 
 if __name__ == "__main__":
-    # Force the output to appear
-    sys.stdout.flush()
-
     # Create the database
     create_database()
 

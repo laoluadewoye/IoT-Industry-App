@@ -9,8 +9,6 @@ from folium import (Map as FoliumMap, Marker as FoliumMarker, CircleMarker as Fo
 from typing import Union
 from collections import Counter
 from datetime import datetime, timedelta
-from threading import Thread, Event
-from time import sleep
 
 # Get core database environmental variables
 defaults: dict[str, str] = {
