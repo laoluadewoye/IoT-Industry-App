@@ -285,7 +285,7 @@ def get_historical_measurements(client: MongoClient, measurements: list[str], al
             measurement_pipeline: list = [
                 {'$match': {'time_recorded': {'$gte': start_date_time, '$lte': end_date_time}}},
                 {'$sort': {'time_recorded': -1}},
-                {'$project': {'_id': 0, 'sensor_name': 1, 'county': 1, 'time_recorded': 1, 'metric': 1}}
+                {'$project': {'_id': 0, 'city': 1, 'county': 1, 'time_recorded': 1, 'metric': 1}}
             ]
         else:
             measurement_pipeline: list = [
@@ -294,7 +294,7 @@ def get_historical_measurements(client: MongoClient, measurements: list[str], al
                     'time_recorded': {'$gte': start_date_time, '$lte': end_date_time}
                 }},
                 {'$sort': {'time_recorded': -1}},
-                {'$project': {'_id': 0, 'sensor_name': 1, 'county': 1, 'time_recorded': 1, 'metric': 1}}
+                {'$project': {'_id': 0, 'city': 1, 'county': 1, 'time_recorded': 1, 'metric': 1}}
             ]
 
         # Use aggregate pipeline to get the latest recorded value for each sensor

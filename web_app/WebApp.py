@@ -25,11 +25,6 @@ DB_PASSWORD_FILE: str = getenv('DB_PASSWORD_FILE', defaults['DB_PASSWORD_FILE'])
 PROXY_HOST: str = getenv('PROXY_HOST', defaults['PROXY_HOST'])
 PROXY_PORT: str = getenv('PROXY_PORT', defaults['PROXY_PORT'])
 
-# Create objects for storing database data
-SENSOR_DATA: Union[list[dict], None] = None
-REAL_TIME_DATA: Union[dict[str, list], None] = None
-HISTORICAL_DATA: Union[dict[str, list], None] = None
-
 # Reload speed
 FRAGMENT_RERUN_SPEED: int = 5
 DATA_UPDATE_SPEED: int = 3
@@ -129,6 +124,13 @@ def load_historical_data() -> Union[dict[str, list], None]:
     return load_data(content)
 
 
+@st.fragment(run_every=DATA_UPDATE_SPEED)
+def pass_data_updates() -> None:
+    st.session_state['SENSOR_DATA'] = load_sensor_data()
+    st.session_state['REAL_TIME_DATA'] = load_real_time_data()
+    st.session_state['HISTORICAL_DATA'] = load_historical_data()
+
+
 def create_time_filter_settings() -> None:
     st.subheader('Select Time Range')
     st.text('This feature is for viewing historical data and anomaly alerts.')
@@ -214,7 +216,7 @@ def create_filter_settings() -> None:
 
     # Get data and save information to session state and sensor list
     sensor_data: Union[list[dict], None] = st.session_state.get('SENSOR_DATA', None)
-    if sensor_data is not None:
+    if sensor_data is not None and len(sensor_data) != 0:
         sensor_list: list[str] = [document['sensor_name'] for document in sensor_data]
 
         # Create dropdown
@@ -234,7 +236,7 @@ def create_filter_settings() -> None:
 def create_sensor_table() -> None:
     # Get data for the table
     sensor_data: Union[list[dict], None] = st.session_state.get('SENSOR_DATA', None)
-    if sensor_data is None:
+    if sensor_data is None or len(sensor_data) == 0:
         st.info('Sensor Data is still loading.', icon="⏳")
         return
 
@@ -324,7 +326,7 @@ def create_sensor_map() -> None:
 
 
 def create_sensor_tab() -> None:
-    st.title('Sensor Summary')
+    st.header('Sensor Summary')
     st.text('This tab provides a summary of the sensors in the database, along with their locations in Maryland.')
 
     # Create the sensor table
@@ -389,7 +391,7 @@ def create_real_time_data_container(real_time_data: dict[str, list], metric_pack
 
 @st.fragment(run_every=FRAGMENT_RERUN_SPEED)
 def create_real_time_tab() -> None:
-    st.title('Latest Real Time Analytics')
+    st.header('Latest Real Time Analytics')
     st.text('This section provides real time summaries for the selected weather sensors in the database.')
 
     # Create a header for the real time data
@@ -408,7 +410,7 @@ def create_real_time_tab() -> None:
                     f'and {len(selected_sensor_cities) - 3} other locations.')
         else:
             cities_str: str = ', '.join(selected_sensor_cities)
-            st.text(f'The averages are calculated from {cities_str[:-2]}.')
+            st.text(f'The averages are calculated from {cities_str}.')
 
     # Get data for boxes
     real_time_data: Union[dict[str, list], None] = st.session_state.get('REAL_TIME_DATA', None)
@@ -440,7 +442,7 @@ def create_time_charts(historical_data: dict[str, list], metric_package: zip) ->
         historical_df: pd.DataFrame = pd.DataFrame(historical_data[metric_key])
         historical_df['time_recorded'] = pd.to_datetime(historical_df['time_recorded'], utc=True)
         historical_df['time_recorded_est'] = historical_df['time_recorded'].dt.tz_convert('US/Eastern')
-        sensor_names: list = historical_df['sensor_name'].unique().tolist()
+        city_names: list = historical_df['city'].unique().tolist()
 
         if metric_name == 'Wind Direction':
             # Create grouping table
@@ -451,7 +453,7 @@ def create_time_charts(historical_data: dict[str, list], metric_package: zip) ->
             st.area_chart(historical_df_size, stack=True, x_label='Date & Time', y_label=f'Wind Direction')
         else:
             # Create pivot table
-            if len(sensor_names) > 25:
+            if len(city_names) > 25:
                 historical_df_grouped = historical_df.groupby(['county', 'time_recorded_est'])
                 historical_df_avg = historical_df_grouped['metric'].mean().reset_index()
                 historical_df_pivot = historical_df_avg.pivot(
@@ -459,7 +461,7 @@ def create_time_charts(historical_data: dict[str, list], metric_package: zip) ->
                 )
             else:
                 historical_df_pivot = historical_df.pivot(
-                    index='time_recorded_est', columns='sensor_name', values='metric'
+                    index='time_recorded_est', columns='city', values='metric'
                 )
 
             # Create line chart
@@ -468,7 +470,7 @@ def create_time_charts(historical_data: dict[str, list], metric_package: zip) ->
 
 @st.fragment(run_every=FRAGMENT_RERUN_SPEED)
 def create_historical_tab() -> None:
-    st.title('Historical Weather Data')
+    st.header('Historical Weather Data')
     st.text('This section provides time-based charts showing the evolution of weather statistics.')
 
     # Create a description of the focused sensors for the historical data
@@ -484,7 +486,7 @@ def create_historical_tab() -> None:
             sensor_desc: str = f'{cities_str}, and {len(selected_sensor_cities) - 3} other locations.'
         else:
             cities_str: str = ', '.join(selected_sensor_cities)
-            sensor_desc: str = f'{cities_str[:-2]}.'
+            sensor_desc: str = f'{cities_str}.'
 
     st.subheader(f'The following charts display information from {sensor_desc}')
 
@@ -558,11 +560,38 @@ def create_anomaly_setting_widget(title: str, generic: bool, **kwargs) -> None:
 
 @st.fragment(run_every=FRAGMENT_RERUN_SPEED)
 def create_anomaly_settings() -> None:
+    # Create a description of the focused sensors for the historical data
+    if st.session_state['all_or_selected'] == 'All':
+        sensor_desc: str = 'All Sensors.'
+    else:
+        selected_sensor_cities: list[str] = st.session_state['sensor_df'][
+            st.session_state['sensor_df']['Sensor Name'].isin(st.session_state['selected_sensors'])
+        ]['City'].to_list()
+
+        if len(selected_sensor_cities) > 3:
+            cities_str: str = ', '.join(selected_sensor_cities[:3])
+            sensor_desc: str = f'{cities_str}, and {len(selected_sensor_cities) - 3} other locations.'
+        else:
+            cities_str: str = ', '.join(selected_sensor_cities)
+            sensor_desc: str = f'{cities_str}.'
+
+
+    # Create time-zone aware dates
+    start_date_str: Union[datetime, str] = st.session_state['start_date_time'] - timedelta(hours=4)
+    end_date_str: Union[datetime, str] = st.session_state['end_date_time'] - timedelta(hours=4)
+
+    start_date_str = start_date_str.strftime("%d %b %Y, %I:%M%p")
+    end_date_str = end_date_str.strftime("%d %b %Y, %I:%M%p")
+
+    st.subheader(f'The following charts display information from {sensor_desc} '
+                 f'during the time range of {start_date_str} to {end_date_str}.')
+
+    # Create the settings dropdowns
     anomaly_col1, anomaly_col2, anomaly_col3, anomaly_col4, anomaly_col5, anomaly_col6 = st.columns(6)
     with anomaly_col1:
         create_anomaly_setting_widget(
             'Humidity Settings', generic=True, generic_unit='Percentage', generic_min=0, generic_max=100,
-            generic_key='humidity'
+            generic_key='humidity_perc'
         )
     with anomaly_col2:
         create_anomaly_setting_widget(
@@ -595,18 +624,90 @@ def create_anomaly_settings() -> None:
         )
 
 
+def check_metric_for_anomalies(historical_data: [dict[str, list]], metric_name: str, metric_title: str) -> None:
+    # Print a title
+    st.subheader(f'{metric_title.title()} Anomalies')
+
+    # Check for humidity anomalies
+    warning_count: int = 0
+    minimum_metric: Union[int, float] = st.session_state[f'min_{metric_name}']
+    maximum_metric: Union[int, float] = st.session_state[f'max_{metric_name}']
+
+    for document in historical_data[metric_name]:
+        below_min: bool = document['metric'] < minimum_metric
+        above_max: bool = document['metric'] > maximum_metric
+        if below_min or above_max:
+            # Determine anomaly description
+            if below_min:
+                anomaly_desc = 'below'
+                anomaly_edgepoint = 'minimum'
+                anomaly_metric = minimum_metric
+            elif above_max:
+                anomaly_desc = 'above'
+                anomaly_edgepoint = 'maximum'
+                anomaly_metric = maximum_metric
+            else:
+                anomaly_desc = ''
+                anomaly_edgepoint = ''
+                anomaly_metric = None
+
+            # Create warning message
+            warning_msg = (f'{metric_title.title()} anomaly detected at {document["city"]} ({document["county"]}) '
+                           f'at {document["time_recorded"]}. '
+                           f'Current {metric_title.lower()} of {document["metric"]} is '
+                           f'{anomaly_desc} the {anomaly_edgepoint} of {anomaly_metric}.')
+            st.warning(warning_msg, icon='⚠️')
+            warning_count += 1
+
+    # Display no warning message if no anomalies were found
+    if warning_count == 0:
+        st.success(f'No {metric_title.lower()} anomalies detected.', icon='✅')
+
+
 @st.fragment(run_every=FRAGMENT_RERUN_SPEED)
 def display_any_anomolies() -> None:
     # Get the historical data
     historical_data: Union[dict[str, list], None] = st.session_state.get('HISTORICAL_DATA', None)
     if historical_data is not None:
-        st.write(historical_data)
+        # Check for humidity anomalies
+        check_metric_for_anomalies(historical_data, 'humidity_perc', 'Humidity Percentage')
+
+        # Check for precipitation anomalies
+        if st.session_state['metric_or_customary'] == 'Metric':
+            precip_params = ['precip_mm', 'Precipitation (Millimeters)']
+        else:
+            precip_params = ['precip_in', 'Precipitation (Inches)']
+        check_metric_for_anomalies(historical_data, *precip_params)
+
+        # Check for air pressure anomalies
+        if st.session_state['metric_or_customary'] == 'Metric':
+            pressure_params = ['pressure_mb', 'Air Pressure (Millibars)']
+        else:
+            pressure_params = ['pressure_in', 'Air Pressure (Inches)']
+        check_metric_for_anomalies(historical_data, *pressure_params)
+
+        # Check for temperature anomalies
+        if st.session_state['metric_or_customary'] == 'Metric':
+            temp_params = ['temp_c', 'Temperature (Celsius)']
+        else:
+            temp_params = ['temp_f', 'Temperature (Fahrenheit)']
+        check_metric_for_anomalies(historical_data, *temp_params)
+
+        # Check for UV Index anomalies
+        check_metric_for_anomalies(historical_data, 'uv_index_score', 'UV Index Score')
+
+        # Check for wind speed anomalies
+        if st.session_state['metric_or_customary'] == 'Metric':
+            wind_params = ['wind_kph', 'Wind Speed (KPH)']
+        else:
+            wind_params = ['wind_mph', 'Wind Speed (MPH)']
+        check_metric_for_anomalies(historical_data, *wind_params)
     else:
         st.info('Historical Data is still loading.', icon="⏳")
 
 
 def create_anomaly_tab() -> None:
-    st.title('Anomaly Tracker')
+    st.header('Anomaly Tracker')
     st.text('This section scans historical data for anomalies based on settings below.')
     st.text('Ranges you select are inclusive of edge numbers.')
 
@@ -617,48 +718,10 @@ def create_anomaly_tab() -> None:
     display_any_anomolies()
 
 
-def update_data() -> None:
-    global SENSOR_DATA, REAL_TIME_DATA, HISTORICAL_DATA
-    while True:
-        SENSOR_DATA = load_sensor_data()
-        REAL_TIME_DATA = load_real_time_data()
-        HISTORICAL_DATA = load_historical_data()
-        sleep(DATA_UPDATE_SPEED)
-
-
-@st.cache_data(ttl=DATA_UPDATE_SPEED)
-def get_cached_sensor_data() -> Union[list[dict], None]:
-    global SENSOR_DATA
-    return SENSOR_DATA
-
-
-@st.cache_data(ttl=DATA_UPDATE_SPEED)
-def get_cached_real_time_data() -> Union[dict[str, list], None]:
-    global REAL_TIME_DATA
-    return REAL_TIME_DATA
-
-
-@st.cache_data(ttl=DATA_UPDATE_SPEED)
-def get_cached_historical_data() -> Union[dict[str, list], None]:
-    global HISTORICAL_DATA
-    return HISTORICAL_DATA
-
-
-@st.fragment(run_every=DATA_UPDATE_SPEED)
-def pass_data_updates() -> None:
-    st.session_state['SENSOR_DATA'] = get_cached_sensor_data()
-    st.session_state['REAL_TIME_DATA'] = get_cached_real_time_data()
-    st.session_state['HISTORICAL_DATA'] = get_cached_historical_data()
-
-
 def create_dashboard() -> None:
     # Create initial settings and title
     st.set_page_config(layout='wide')
     st.title('Weather Data Dashboard')
-
-    # Start the data update thread
-    data_update_thread = Thread(name='data_update_thread', target=update_data, daemon=True)
-    data_update_thread.start()
 
     # Create a section to pass data updates
     pass_data_updates()
