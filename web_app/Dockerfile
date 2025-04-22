@@ -19,4 +19,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 USER app
 
 # Run the app
-ENTRYPOINT ["streamlit", "run", "WebApp.py"]
+ENTRYPOINT ["streamlit", "run", "WebAppMono.py"]
