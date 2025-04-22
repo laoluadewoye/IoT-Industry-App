@@ -4,10 +4,13 @@ from streamlit_folium import st_folium
 from os import getenv
 from hashlib import sha256
 from requests import get, Response
-from folium import Map as FoliumMap, Marker as FoliumMarker, CircleMarker as FoliumCircleMarker, Icon as FoliumIcon
+from folium import (Map as FoliumMap, Marker as FoliumMarker, CircleMarker as FoliumCircleMarker, Icon as FoliumIcon,
+                    FeatureGroup as FoliumFeatureGroup)
 from typing import Union
 from collections import Counter
 from datetime import datetime, timedelta
+from threading import Thread, Event
+from time import sleep
 
 # Get core database environmental variables
 defaults: dict[str, str] = {
@@ -21,6 +24,15 @@ DB_USER: str = getenv('DB_USER', defaults['DB_USER'])
 DB_PASSWORD_FILE: str = getenv('DB_PASSWORD_FILE', defaults['DB_PASSWORD_FILE'])
 PROXY_HOST: str = getenv('PROXY_HOST', defaults['PROXY_HOST'])
 PROXY_PORT: str = getenv('PROXY_PORT', defaults['PROXY_PORT'])
+
+# Create objects for storing database data
+SENSOR_DATA: Union[list[dict], None] = None
+REAL_TIME_DATA: Union[dict[str, list], None] = None
+HISTORICAL_DATA: Union[dict[str, list], None] = None
+
+# Reload speed
+FRAGMENT_RERUN_SPEED: int = 5
+DATA_UPDATE_SPEED: int = 3
 
 
 def load_data(content: dict[str, str]) -> Union[dict[str, list], list[dict], None]:
@@ -36,7 +48,6 @@ def load_data(content: dict[str, str]) -> Union[dict[str, list], list[dict], Non
     return response.json()['result']
 
 
-@st.cache_data(ttl=9)
 def load_sensor_data() -> Union[list[dict], None]:
     # Create password hash
     hashed_data_gen_password: str = sha256(open(DB_PASSWORD_FILE).read().encode()).hexdigest()
@@ -118,7 +129,57 @@ def load_historical_data() -> Union[dict[str, list], None]:
     return load_data(content)
 
 
-@st.fragment
+def create_time_filter_settings() -> None:
+    st.subheader('Select Time Range')
+    st.text('This feature is for viewing historical data and anomaly alerts.')
+
+    # Create choices
+    date_time_range_choice = st.radio(
+        "Select the range of data you want to view:",
+        [
+            'Last 5 Minutes', 'Last Half Hour', 'Last Hour', 'Last 5 Hours',
+            'Last Day', 'Last Week', 'Last Month', 'Custom Range'
+        ],
+        horizontal=True,
+        key="date_time_range_choice"
+    )
+    custom_time_disabled: bool = date_time_range_choice != 'Custom Range'
+
+    # Create inputs for a custom time range
+    st.subheader('Select Time Range: Start Information')
+    st.text('To use this feature, select "Custom Range" above.')
+    custom_start_date = st.date_input(
+        'Select Start Date:', 'today', disabled=custom_time_disabled, key='custom_start_date'
+    )
+    custom_start_time = st.time_input(
+        'Select Start Time:', '00:00', disabled=custom_time_disabled, key='custom_start_time'
+    )
+
+    st.subheader('Select Time Range: End Information')
+    st.text('To use this feature, select "Custom Range" above.')
+    custom_end_date = st.date_input('Select End Date:', 'today', disabled=custom_time_disabled, key='custom_end_date')
+    custom_end_time = st.time_input('Select End Time:', '23:59', disabled=custom_time_disabled, key='custom_end_time')
+
+    # Calculate the start and end dates and times
+    end_date_time = datetime.now()
+    if date_time_range_choice != 'Custom Range':
+        default_deltas = {
+            'Last 5 Minutes': timedelta(minutes=5),
+            'Last Half Hour': timedelta(hours=0.5),
+            'Last Hour': timedelta(hours=1),
+            'Last 5 Hours': timedelta(hours=5),
+            'Last Day': timedelta(days=1),
+            'Last Week': timedelta(days=7),
+            'Last Month': timedelta(days=30)
+        }
+        st.session_state['start_date_time'] = end_date_time - default_deltas[date_time_range_choice]
+        st.session_state['end_date_time'] = end_date_time
+    else:
+        st.session_state['start_date_time'] = datetime.combine(custom_start_date, custom_start_time)
+        st.session_state['end_date_time'] = datetime.combine(custom_end_date, custom_end_time)
+
+
+@st.fragment(run_every=FRAGMENT_RERUN_SPEED)
 def create_filter_settings() -> None:
     st.title('Filter Settings')
     st.text('Use this sidebar to choose what sensors you wish to examine.')
@@ -152,116 +213,32 @@ def create_filter_settings() -> None:
     st.text('To use this feature, select "Selected Options" above.')
 
     # Get data and save information to session state and sensor list
-    sensor_data: Union[list[dict], None] = load_sensor_data()
-    if sensor_data is None:
-        sensor_data = []
+    sensor_data: Union[list[dict], None] = st.session_state.get('SENSOR_DATA', None)
+    if sensor_data is not None:
+        sensor_list: list[str] = [document['sensor_name'] for document in sensor_data]
 
-    sensor_list: list[str] = [document['sensor_name'] for document in sensor_data]
-
-    # Create dropdown
-    selected_sensors_disabled: bool = all_or_selected == 'All'
-    selected_sensors = st.multiselect(
-        'Select Sensors', sensor_list, default=sensor_list[0], disabled=selected_sensors_disabled,
-        key='selected_sensors',
-    )
-
-    # Select the time range for historical and anomaly tabs
-    st.subheader('Select Time Range')
-    st.text('This feature is for viewing historical data and anomaly alerts.')
-
-    date_time_range_choice = st.radio(
-        "Select the range of data you want to view:",
-        [
-            'Last 5 Minutes', 'Last Half Hour', 'Last Hour', 'Last 5 Hours',
-            'Last Day', 'Last Week', 'Last Month', 'Custom Range'
-        ],
-        horizontal=True,
-        key="date_time_range_choice"
-    )
-    custom_time_disabled: bool = date_time_range_choice != 'Custom Range'
-
-    st.subheader('Select Time Range: Start Information')
-    st.text('To use this feature, select "Custom Range" above.')
-    custom_start_date = st.date_input(
-        'Select Start Date:', 'today', disabled=custom_time_disabled, key='custom_start_date'
-    )
-    custom_start_time = st.time_input(
-        'Select Start Time:', '00:00', disabled=custom_time_disabled, key='custom_start_time'
-    )
-
-    st.subheader('Select Time Range: End Information')
-    st.text('To use this feature, select "Custom Range" above.')
-    custom_end_date = st.date_input('Select End Date:', 'today', disabled=custom_time_disabled, key='custom_end_date')
-    custom_end_time = st.time_input('Select End Time:', '23:59', disabled=custom_time_disabled, key='custom_end_time')
-
-    end_date_time = datetime.now()
-    if date_time_range_choice != 'Custom Range':
-        default_deltas = {
-            'Last 5 Minutes': timedelta(minutes=5),
-            'Last Half Hour': timedelta(hours=0.5),
-            'Last Hour': timedelta(hours=1),
-            'Last 5 Hours': timedelta(hours=5),
-            'Last Day': timedelta(days=1),
-            'Last Week': timedelta(days=7),
-            'Last Month': timedelta(days=30)
-        }
-        st.session_state['start_date_time'] = end_date_time - default_deltas[date_time_range_choice]
-        st.session_state['end_date_time'] = end_date_time
-    else:
-        st.session_state['start_date_time'] = datetime.combine(custom_start_date, custom_start_time)
-        st.session_state['end_date_time'] = datetime.combine(custom_end_date, custom_end_time)
-
-
-@st.fragment(run_every=3)
-def create_sensor_map() -> st.map:
-    # Create the map around the DMV
-    vienna_coordinates: list[float] = [38.900692, -77.270946]
-    sensor_map_folium: FoliumMap = FoliumMap(vienna_coordinates, zoom_start=8)
-
-    # Add markers for each sensor
-    for index, row in st.session_state['sensor_df'].iterrows():
-        # Create the popup information
-        popup_text: str = f'Sensor Name: {row["Sensor Name"]}'
-
-        # Differentiate the marker based on what is selected
-        selected: bool = (
-            st.session_state['all_or_selected'] == 'All' or
-            row['Sensor Name'] in st.session_state['selected_sensors']
+        # Create dropdown
+        selected_sensors_disabled: bool = all_or_selected == 'All'
+        selected_sensors = st.multiselect(
+            'Select Sensors', sensor_list, default=sensor_list[0], disabled=selected_sensors_disabled,
+            key='selected_sensors',
         )
+    else:
+        st.info('Sensor Data is still loading.', icon="⏳")
 
-        # Add new marker to the map
-        if selected:
-            new_marker: Union[FoliumMarker, FoliumCircleMarker] = FoliumMarker(
-                [row['Latitude'], row['Longitude']],
-                popup=popup_text,
-                icon=FoliumIcon(color='red'),
-            )
-        else:
-            new_marker: Union[FoliumMarker, FoliumCircleMarker] = FoliumCircleMarker(
-                [row['Latitude'], row['Longitude']],
-                popup=popup_text,
-                color='blue',
-                opacity=0.1,
-                fill_color='blue',
-                fill_opacity=0.1,
-            )
-        new_marker.add_to(sensor_map_folium)
-
-    # Create a streamlit map object with folium extension
-    sensor_map_st: st.map = st_folium(sensor_map_folium, use_container_width=True, key='sensor_map')
-
-    return sensor_map_st
+    # Create time filter settings
+    create_time_filter_settings()
 
 
-def create_sensor_tab() -> None:
-    st.title('Sensor Summary')
-    st.text('This tab provides a summary of the sensors in the database, along with their locations in Maryland.')
-
+@st.fragment(run_every=FRAGMENT_RERUN_SPEED)
+def create_sensor_table() -> None:
     # Get data for the table
-    sensor_data: Union[list[dict], None] = load_sensor_data()
+    sensor_data: Union[list[dict], None] = st.session_state.get('SENSOR_DATA', None)
     if sensor_data is None:
-        sensor_data = []
+        st.info('Sensor Data is still loading.', icon="⏳")
+        return
 
+    # Parse the data into a dataframe-friendly format
     sensor_list: list[list] = [
         [
             document['_id'], document['sensor_name'], document['city'], document['county'], document['state'],
@@ -271,18 +248,103 @@ def create_sensor_tab() -> None:
     ]
 
     # Create the dataframe and display the table
-    st.subheader('Sensor Table')
-    st.text('This table provides a summary of the sensors in the database, along with their locations in Maryland.')
     st.session_state['sensor_df']: pd.DataFrame = pd.DataFrame(sensor_list, columns=[
         'Mongo ID', 'Sensor Name', 'City', 'County', 'State', 'Latitude', 'Longitude'
     ])
     st.dataframe(st.session_state['sensor_df'])
 
+
+@st.fragment(run_every=FRAGMENT_RERUN_SPEED)
+def create_sensor_map() -> None:
+    # Early return if sensor_df doesn't exist
+    if 'sensor_df' not in st.session_state:
+        return
+
+    # Add new markers to the feature group
+    for index, row in st.session_state['sensor_df'].iterrows():
+        # Check if it is in the feature dictionary and skip if it is
+        is_red_marker = row['Sensor Name'] in st.session_state['sensor_feature_dict']['Red'].keys()
+        is_blue_marker = row['Sensor Name'] in st.session_state['sensor_feature_dict']['Blue'].keys()
+
+        # Differentiate the marker based on what is selected
+        selected: bool = (
+            st.session_state['all_or_selected'] == 'All' or
+            row['Sensor Name'] in st.session_state['selected_sensors']
+        )
+
+        # Marker management + Skipping Logic
+        if (is_red_marker and selected) or (is_blue_marker and not selected):
+            continue
+        elif is_red_marker and not selected:  # Move non-selected markers to blue
+            st.session_state['sensor_feature_dict']['Red'].pop(row['Sensor Name'])
+        elif is_blue_marker and selected:  # Move selected markers to red
+            st.session_state['sensor_feature_dict']['Blue'].pop(row['Sensor Name'])
+
+        # Create the popup information
+        popup_text: str = f'Sensor Name: {row["Sensor Name"]}'
+
+        # Create a new marker and add it to the feature dictionary
+        if selected:
+            new_marker: Union[FoliumMarker, FoliumCircleMarker] = FoliumMarker(
+                [row['Latitude'], row['Longitude']],
+                popup=popup_text,
+                icon=FoliumIcon(color='red'),
+            )
+            st.session_state['sensor_feature_dict']['Red'][row['Sensor Name']] = new_marker
+        else:
+            new_marker: Union[FoliumMarker, FoliumCircleMarker] = FoliumCircleMarker(
+                [row['Latitude'], row['Longitude']],
+                popup=popup_text,
+                color='blue',
+                opacity=0.1,
+                fill_color='blue',
+                fill_opacity=0.1,
+            )
+            st.session_state['sensor_feature_dict']['Blue'][row['Sensor Name']] = new_marker
+
+    # Establish a new map
+    vienna_coordinates: list[float] = [38.900692, -77.270946]  # Create the map around the DMV
+    zoom_level = 8
+    sensor_map = FoliumMap(vienna_coordinates, zoom_start=zoom_level)
+
+    # Create new feature group and populate it
+    sensor_feature_group: FoliumFeatureGroup = FoliumFeatureGroup(name='Sensors')
+    for marker in st.session_state['sensor_feature_dict']['Blue'].values():
+        sensor_feature_group.add_child(marker)
+    for marker in st.session_state['sensor_feature_dict']['Red'].values():
+        sensor_feature_group.add_child(marker)
+
+    # Create a streamlit map object with folium extension
+    sensor_map_st: st.map = st_folium(
+        sensor_map,
+        feature_group_to_add=sensor_feature_group,
+        use_container_width=True,
+        key='sensor_map'
+    )
+
+
+def create_sensor_tab() -> None:
+    st.title('Sensor Summary')
+    st.text('This tab provides a summary of the sensors in the database, along with their locations in Maryland.')
+
+    # Create the sensor table
+    st.subheader('Sensor Table')
+    st.text('This table provides a summary of the sensors in the database, along with their locations in Maryland.')
+    create_sensor_table()
+
     # Create a map of the sensors
     st.subheader('Sensor Map')
     st.text('This map provides a summary of the sensors in the database, along with their locations in Maryland.')
     st.text('Red markers represent sensors that are selected, while faint blue markers represent sensors that are not.')
-    sensor_map: st = create_sensor_map()
+
+    # Create a persistent feature group dictionary
+    if 'sensor_feature_dict' not in st.session_state:
+        st.session_state['sensor_feature_dict']: dict[str, Union[FoliumMarker, FoliumCircleMarker]] = {}
+        st.session_state['sensor_feature_dict']['Red'] = {}
+        st.session_state['sensor_feature_dict']['Blue'] = {}
+
+    # Add markers to the map
+    create_sensor_map()
 
 
 def create_real_time_data_container(real_time_data: dict[str, list], metric_package: zip) -> None:
@@ -325,7 +387,7 @@ def create_real_time_data_container(real_time_data: dict[str, list], metric_pack
             column_index += 1
 
 
-@st.fragment(run_every=3)
+@st.fragment(run_every=FRAGMENT_RERUN_SPEED)
 def create_real_time_tab() -> None:
     st.title('Latest Real Time Analytics')
     st.text('This section provides real time summaries for the selected weather sensors in the database.')
@@ -349,7 +411,7 @@ def create_real_time_tab() -> None:
             st.text(f'The averages are calculated from {cities_str[:-2]}.')
 
     # Get data for boxes
-    real_time_data: Union[dict[str, list], None] = load_real_time_data()
+    real_time_data: Union[dict[str, list], None] = st.session_state.get('REAL_TIME_DATA', None)
     if real_time_data is not None:
         # Create metrics
         metric_keys: list[str] = list(real_time_data.keys())
@@ -359,13 +421,8 @@ def create_real_time_tab() -> None:
         ]
         metric_modifiers: list[str] = list(st.session_state['unit_modifiers'])
         create_real_time_data_container(real_time_data, zip(metric_keys, generic_metric_names, metric_modifiers))
-
-
-def find_county_name(name: str) -> str:
-    try:
-        return st.session_state['sensor_df'][st.session_state['sensor_df']['Sensor Name'] == name]['County'].values[0]
-    except IndexError:
-        return 'General'
+    else:
+        st.info('Real Time Data is still loading.', icon="⏳")
 
 
 def create_time_charts(historical_data: dict[str, list], metric_package: zip) -> None:
@@ -409,7 +466,7 @@ def create_time_charts(historical_data: dict[str, list], metric_package: zip) ->
             st.line_chart(historical_df_pivot, x_label='Date & Time', y_label=f'{metric_name} ({metric_modifier})')
 
 
-@st.fragment(run_every=3)
+@st.fragment(run_every=FRAGMENT_RERUN_SPEED)
 def create_historical_tab() -> None:
     st.title('Historical Weather Data')
     st.text('This section provides time-based charts showing the evolution of weather statistics.')
@@ -432,7 +489,7 @@ def create_historical_tab() -> None:
     st.subheader(f'The following charts display information from {sensor_desc}')
 
     # Get the historical data
-    historical_data: dict[str, list] = load_historical_data()
+    historical_data: Union[dict[str, list], None] = st.session_state.get('HISTORICAL_DATA', None)
     if historical_data is not None:
         # Create metrics
         metric_keys: list[str] = list(historical_data.keys())
@@ -442,6 +499,8 @@ def create_historical_tab() -> None:
         ]
         metric_modifiers: list[str] = list(st.session_state['unit_modifiers'])
         create_time_charts(historical_data, zip(metric_keys, generic_metric_names, metric_modifiers))
+    else:
+        st.info('Historical Data is still loading.', icon="⏳")
 
 
 def create_anomaly_setting_widget(title: str, generic: bool, **kwargs) -> None:
@@ -497,7 +556,7 @@ def create_anomaly_setting_widget(title: str, generic: bool, **kwargs) -> None:
                 )
 
 
-@st.fragment(run_every=3)
+@st.fragment(run_every=FRAGMENT_RERUN_SPEED)
 def create_anomaly_settings() -> None:
     anomaly_col1, anomaly_col2, anomaly_col3, anomaly_col4, anomaly_col5, anomaly_col6 = st.columns(6)
     with anomaly_col1:
@@ -536,11 +595,14 @@ def create_anomaly_settings() -> None:
         )
 
 
-@st.fragment(run_every=3)
+@st.fragment(run_every=FRAGMENT_RERUN_SPEED)
 def display_any_anomolies() -> None:
     # Get the historical data
-    historical_data: dict[str, list] = load_historical_data()
-    st.write(historical_data)
+    historical_data: Union[dict[str, list], None] = st.session_state.get('HISTORICAL_DATA', None)
+    if historical_data is not None:
+        st.write(historical_data)
+    else:
+        st.info('Historical Data is still loading.', icon="⏳")
 
 
 def create_anomaly_tab() -> None:
@@ -555,27 +617,73 @@ def create_anomaly_tab() -> None:
     display_any_anomolies()
 
 
-# Create initial settings and title
-st.set_page_config(layout='wide')
-st.title('Weather Data Dashboard')
+def update_data() -> None:
+    global SENSOR_DATA, REAL_TIME_DATA, HISTORICAL_DATA
+    while True:
+        SENSOR_DATA = load_sensor_data()
+        REAL_TIME_DATA = load_real_time_data()
+        HISTORICAL_DATA = load_historical_data()
+        sleep(DATA_UPDATE_SPEED)
 
-# Create a sidebar
-with st.sidebar:
-    create_filter_settings()
 
-# Create tabs
-sensor_tab, real_time_tab, historical_tab, anomaly_tab = st.tabs(
-    ['Sensor Information', 'Real Time Information', 'Historical Information', 'Anomaly Information']
-)
+@st.cache_data(ttl=DATA_UPDATE_SPEED)
+def get_cached_sensor_data() -> Union[list[dict], None]:
+    global SENSOR_DATA
+    return SENSOR_DATA
 
-with sensor_tab:
-    create_sensor_tab()
 
-with real_time_tab:
-    create_real_time_tab()
+@st.cache_data(ttl=DATA_UPDATE_SPEED)
+def get_cached_real_time_data() -> Union[dict[str, list], None]:
+    global REAL_TIME_DATA
+    return REAL_TIME_DATA
 
-with historical_tab:
-    create_historical_tab()
 
-with anomaly_tab:
-    create_anomaly_tab()
+@st.cache_data(ttl=DATA_UPDATE_SPEED)
+def get_cached_historical_data() -> Union[dict[str, list], None]:
+    global HISTORICAL_DATA
+    return HISTORICAL_DATA
+
+
+@st.fragment(run_every=DATA_UPDATE_SPEED)
+def pass_data_updates() -> None:
+    st.session_state['SENSOR_DATA'] = get_cached_sensor_data()
+    st.session_state['REAL_TIME_DATA'] = get_cached_real_time_data()
+    st.session_state['HISTORICAL_DATA'] = get_cached_historical_data()
+
+
+def create_dashboard() -> None:
+    # Create initial settings and title
+    st.set_page_config(layout='wide')
+    st.title('Weather Data Dashboard')
+
+    # Start the data update thread
+    data_update_thread = Thread(name='data_update_thread', target=update_data, daemon=True)
+    data_update_thread.start()
+
+    # Create a section to pass data updates
+    pass_data_updates()
+
+    # Create a sidebar
+    with st.sidebar:
+        create_filter_settings()
+
+    # Create tabs
+    sensor_tab, real_time_tab, historical_tab, anomaly_tab = st.tabs(
+        ['Sensor Information', 'Real Time Information', 'Historical Information', 'Anomaly Information']
+    )
+
+    with sensor_tab:
+        create_sensor_tab()
+
+    with real_time_tab:
+        create_real_time_tab()
+
+    with historical_tab:
+        create_historical_tab()
+
+    with anomaly_tab:
+        create_anomaly_tab()
+
+
+if __name__ == '__main__':
+    create_dashboard()
